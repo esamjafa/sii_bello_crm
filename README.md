@@ -25,7 +25,7 @@ Before release, run `npm run build`. Run `node scripts/deployment-audit.mjs` wit
 
 Appointment writes use a PostgreSQL transaction-scoped advisory lock. Hosted data transfer and local application activation are complete; see `POSTGRES_MIGRATION.md` for verification and rollback details.
 
-Set `DATABASE_URL`, `DIRECT_URL`, and `SESSION_SECRET` in the hosting environment. Run `npm run db:deploy` before launching the app. Preserve the session secret when migrating existing accounts. The app uses HTTPS secure cookies in production. Vercel deployment, provider backups, and real notification delivery still need verification.
+Set `DATABASE_URL`, `DIRECT_URL`, and `SESSION_SECRET` in the hosting environment. Follow [Vercel deployment](VERCEL_DEPLOYMENT.md) for preview setup and the manually triggered production migration workflow. Preserve the session secret when migrating existing accounts. The app uses HTTPS secure cookies in production. Vercel deployment, provider backups, and real notification delivery still need verification.
 
 ## Roles
 
@@ -39,4 +39,4 @@ Set `DATABASE_URL`, `DIRECT_URL`, and `SESSION_SECRET` in the hosting environmen
 
 Admins and God Mode users create additional accounts from **Users**. Admins cannot create or edit God Mode accounts. For an existing user, leave the password field blank to keep the current password. Monetary values use Israeli shekels. Date and time values are stored as UTC and displayed in the visitor's browser time zone.
 
-This is a single salon deployment. Back up the SQLite database regularly and restrict access to the deployment environment variables.
+This is a single salon deployment. Back up the PostgreSQL database regularly and restrict access to the deployment environment variables.

@@ -1,0 +1,42 @@
+name: Production migrations
+
+on:
+  workflow_dispatch:
+    inputs:
+      confirmation:
+        description: 'Type migrate-production to apply the selected main commit migrations'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: production-database-migrations
+  cancel-in-progress: false
+
+jobs:
+  migrate:
+    if: github.ref == 'refs/heads/main' && inputs.confirmation == 'migrate-production'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    environment: production
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - name: Apply committed production migrations
+        env:
+          DATABASE_URL: ${{ secrets.DIRECT_URL }}
+          DIRECT_URL: ${{ secrets.DIRECT_URL }}
+        shell: bash
+        run: |
+          if [[ -z "$DIRECT_URL" ]]; then
+            echo 'Configure DIRECT_URL in the production GitHub environment.' >&2
+            exit 1
+          fi
+          npm run db:deploy
+          npx --no-install prisma migrate status
