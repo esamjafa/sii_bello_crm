@@ -1,0 +1,2 @@
+import { NextResponse } from 'next/server';import { bookingCustomerId } from '@/lib/booking-auth';import { availableSlots } from '@/lib/availability';
+export async function GET(request:Request){if(!await bookingCustomerId())return NextResponse.json({error:'Verification required'},{status:401});const url=new URL(request.url);return NextResponse.json(await availableSlots(url.searchParams.get('serviceId')||'',url.searchParams.get('date')||''));}

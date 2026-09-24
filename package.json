@@ -1,0 +1,47 @@
+{
+  "name": "salon-crm",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "dev:https": "next dev --experimental-https --experimental-https-key certificates/localhost-key.pem --experimental-https-cert certificates/localhost-cert.pem -p 3001",
+    "build": "prisma generate && next build",
+    "typecheck": "prisma generate && tsc --noEmit",
+    "check": "prisma validate && npm run typecheck",
+    "test:audit": "node scripts/deployment-audit.mjs",
+    "start": "next start",
+    "db:migrate": "prisma migrate dev",
+    "db:deploy": "prisma migrate deploy",
+    "db:seed": "tsx prisma/seed.ts",
+    "db:backup": "python scripts/backup-sqlite.py --source prisma/dev.db",
+    "db:pg:generate": "node scripts/postgres.mjs generate",
+    "db:pg:validate": "node scripts/postgres.mjs validate",
+    "db:pg:deploy": "node scripts/postgres.mjs deploy",
+    "db:pg:status": "node scripts/postgres.mjs status",
+    "db:transfer": "node scripts/transfer-postgres.mjs"
+  },
+  "dependencies": {
+    "@prisma/client": "^6.16.2",
+    "bcryptjs": "^3.0.2",
+    "jose": "^6.1.0",
+    "next": "^15.5.3",
+    "react": "^19.1.1",
+    "react-dom": "^19.1.1",
+    "zod": "^4.1.11"
+  },
+  "devDependencies": {
+    "@types/bcryptjs": "^2.4.6",
+    "@types/node": "^22.18.6",
+    "@types/react": "^19.1.13",
+    "@types/react-dom": "^19.1.9",
+    "prisma": "^6.16.2",
+    "tsx": "^4.20.5",
+    "typescript": "^5.9.2"
+  },
+  "allowScripts": {
+    "@prisma/client@6.19.3": true,
+    "@prisma/engines@6.19.3": true,
+    "esbuild@0.28.2": true,
+    "prisma@6.19.3": true
+  }
+}

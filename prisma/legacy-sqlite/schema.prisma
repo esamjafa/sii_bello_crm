@@ -1,0 +1,355 @@
+generator client {
+  provider = "prisma-client-js"
+  output = "../../generated/sqlite"
+}
+datasource db {
+  provider = "sqlite"
+  url = env("SQLITE_SOURCE_URL")
+}
+
+enum Role {
+  GOD
+  ADMIN
+  MANAGER
+  STAFF
+  VIEWER
+  CUSTOMER
+}
+enum AppointmentStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+  NO_SHOW
+}
+enum InvoiceStatus {
+  UNPAID
+  PARTIAL
+  PAID
+  VOID
+}
+enum ExpenseStatus {
+  DUE
+  PAID
+}
+
+model User {
+  id String @id @default(cuid())
+  username String @unique
+  email String? @unique
+  name String
+  passwordHash String
+  role Role @default(STAFF)
+  active Boolean @default(true)
+  createdAt DateTime @default(now())
+  failedLoginAttempts Int @default(0)
+  lockedUntil DateTime?
+  dailyLockCount Int @default(0)
+  lockCountDate String?
+  requiresGodUnlock Boolean @default(false)
+  customerId String? @unique
+  customer Customer? @relation(fields:[customerId], references:[id], onDelete:SetNull)
+  auditLogs AuditLog[]
+  reviewedRequests ServiceRequest[] @relation("ReviewedBy")
+}
+
+model Customer {
+  id String @id @default(cuid())
+  name String
+  phone String @unique
+  email String?
+  notes String?
+  followUpAt DateTime?
+  lastVisitAt DateTime?
+  relationshipStatus String @default("NEW")
+  createdAt DateTime @default(now())
+  appointments Appointment[]
+  invoices Invoice[]
+  laserPlans LaserPlan[]
+  user User?
+  serviceRequests ServiceRequest[]
+}
+
+model Service {
+  id String @id @default(cuid())
+  name String
+  price Decimal
+  durationMinutes Int @default(60)
+  active Boolean @default(true)
+  appointments Appointment[]
+  invoices Invoice[]
+  serviceRequests ServiceRequest[]
+}
+
+model ServiceRequest {
+  id String @id @default(cuid())
+  customerId String
+  customer Customer @relation(fields:[customerId], references:[id], onDelete:Restrict)
+  serviceId String
+  service Service @relation(fields:[serviceId], references:[id], onDelete:Restrict)
+  preferredAt DateTime
+  notes String?
+  status String @default("PENDING")
+  adminNote String?
+  reviewedAt DateTime?
+  reviewedById String?
+  reviewedBy User? @relation("ReviewedBy", fields:[reviewedById], references:[id], onDelete:SetNull)
+  appointmentId String? @unique
+  invoiceId String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([status, createdAt])
+  @@index([customerId])
+}
+
+model WorkingHour {
+  id String @id @default(cuid())
+  dayOfWeek Int @unique
+  openTime String
+  closeTime String
+  active Boolean @default(true)
+  updatedAt DateTime @updatedAt
+}
+
+model BookingVerification {
+  id String @id @default(cuid())
+  phone String
+  codeHash String
+  expiresAt DateTime
+  attempts Int @default(0)
+  verifiedAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([phone, createdAt])
+}
+
+model AuditLog {
+  id String @id @default(cuid())
+  actorId String?
+  actor User? @relation(fields:[actorId], references:[id], onDelete:SetNull)
+  actorName String
+  actorRole String
+  action String
+  entity String
+  entityId String?
+  details String?
+  ipAddress String?
+  createdAt DateTime @default(now())
+  @@index([createdAt])
+  @@index([actorId])
+}
+
+model NotificationLog {
+  id String @id @default(cuid())
+  serviceRequestId String?
+  channel String
+  recipient String
+  event String
+  status String
+  providerId String?
+  error String?
+  createdAt DateTime @default(now())
+  @@index([serviceRequestId])
+  @@index([createdAt])
+}
+
+model Staff {
+  id String @id @default(cuid())
+  name String
+  phone String?
+  email String?
+  title String?
+  active Boolean @default(true)
+  appointments Appointment[]
+  laserSessions LaserSession[]
+}
+
+model Appointment {
+  id String @id @default(cuid())
+  customerId String
+  customer Customer @relation(fields:[customerId], references:[id], onDelete:Restrict)
+  serviceId String
+  service Service @relation(fields:[serviceId], references:[id], onDelete:Restrict)
+  staffId String?
+  staff Staff? @relation(fields:[staffId], references:[id], onDelete:SetNull)
+  startsAt DateTime
+  status AppointmentStatus @default(SCHEDULED)
+  notes String?
+  createdAt DateTime @default(now())
+  @@index([startsAt])
+}
+
+model Invoice {
+  id String @id @default(cuid())
+  customerId String
+  customer Customer @relation(fields:[customerId], references:[id], onDelete:Restrict)
+  serviceId String?
+  service Service? @relation(fields:[serviceId], references:[id], onDelete:SetNull)
+  description String
+  amount Decimal
+  paidAmount Decimal @default(0)
+  status InvoiceStatus @default(UNPAID)
+  dueAt DateTime?
+  createdAt DateTime @default(now())
+  @@index([createdAt])
+}
+
+model Expense {
+  id String @id @default(cuid())
+  payee String
+  category String
+  description String
+  amount Decimal
+  dueAt DateTime
+  paidAt DateTime?
+  status ExpenseStatus @default(DUE)
+  createdAt DateTime @default(now())
+  @@index([dueAt])
+}
+
+model CollegeCourse {
+  id String @id @default(cuid())
+  title String
+  category String @default("COSMETIC")
+  fee Decimal @default(0)
+  description String?
+  active Boolean @default(true)
+  createdAt DateTime @default(now())
+  enrollments StudentEnrollment[]
+}
+
+model Student {
+  id String @id @default(cuid())
+  name String
+  phone String @unique
+  email String?
+  status String @default("NEW")
+  followUpAt DateTime?
+  notes String?
+  createdAt DateTime @default(now())
+  enrollments StudentEnrollment[]
+  contacts StudentContact[]
+}
+
+model StudentEnrollment {
+  id String @id @default(cuid())
+  studentId String
+  student Student @relation(fields:[studentId], references:[id], onDelete:Restrict)
+  courseId String
+  course CollegeCourse @relation(fields:[courseId], references:[id], onDelete:Restrict)
+  fee Decimal
+  enrolledAt DateTime @default(now())
+  notes String?
+  payments StudentPayment[]
+  @@index([studentId])
+}
+
+model StudentPayment {
+  id String @id @default(cuid())
+  enrollmentId String
+  enrollment StudentEnrollment @relation(fields:[enrollmentId], references:[id], onDelete:Restrict)
+  amount Decimal
+  paidAt DateTime @default(now())
+  method String @default("CASH")
+  notes String?
+  @@index([enrollmentId])
+}
+
+model StudentContact {
+  id String @id @default(cuid())
+  studentId String
+  student Student @relation(fields:[studentId], references:[id], onDelete:Restrict)
+  contactedAt DateTime @default(now())
+  channel String @default("PHONE")
+  outcome String
+  notes String?
+  nextFollowUpAt DateTime?
+  @@index([studentId])
+}
+
+model Event {
+  id String @id @default(cuid())
+  name String
+  location String?
+  startsAt DateTime?
+  notes String?
+  createdAt DateTime @default(now())
+  packages EventPackage[]
+  leads EventLead[]
+}
+
+model EventPackage {
+  id String @id @default(cuid())
+  eventId String?
+  event Event? @relation(fields:[eventId], references:[id], onDelete:SetNull)
+  name String
+  price Decimal
+  description String?
+  active Boolean @default(true)
+  leads EventLead[]
+}
+
+model EventLead {
+  id String @id @default(cuid())
+  eventId String?
+  event Event? @relation(fields:[eventId], references:[id], onDelete:SetNull)
+  packageId String?
+  package EventPackage? @relation(fields:[packageId], references:[id], onDelete:SetNull)
+  name String
+  phone String
+  region String @default("LOCAL")
+  stage String @default("NEW")
+  agreedAmount Decimal @default(0)
+  paidAmount Decimal @default(0)
+  followUpAt DateTime?
+  notes String?
+  createdAt DateTime @default(now())
+  contacts EventContact[]
+  @@index([region, stage])
+}
+
+model EventContact {
+  id String @id @default(cuid())
+  leadId String
+  lead EventLead @relation(fields:[leadId], references:[id], onDelete:Restrict)
+  contactedAt DateTime @default(now())
+  channel String @default("PHONE")
+  outcome String
+  notes String?
+  nextFollowUpAt DateTime?
+  @@index([leadId])
+}
+
+model LaserPlan {
+  id String @id @default(cuid())
+  customerId String
+  customer Customer @relation(fields:[customerId], references:[id], onDelete:Restrict)
+  area String
+  sessionsTotal Int
+  consentNotes String?
+  followUpAt DateTime?
+  startedAt DateTime @default(now())
+  sessions LaserSession[]
+  documents LaserDocument[]
+  @@index([customerId])
+}
+
+model LaserSession {
+  id String @id @default(cuid())
+  planId String
+  plan LaserPlan @relation(fields:[planId], references:[id], onDelete:Restrict)
+  staffId String?
+  staff Staff? @relation(fields:[staffId], references:[id], onDelete:SetNull)
+  performedAt DateTime @default(now())
+  notes String?
+  @@index([planId])
+}
+
+model LaserDocument {
+  id String @id @default(cuid())
+  planId String
+  plan LaserPlan @relation(fields:[planId], references:[id], onDelete:Restrict)
+  filename String
+  mimeType String
+  content Bytes
+  createdAt DateTime @default(now())
+  @@index([planId])
+}

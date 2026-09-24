@@ -1,0 +1,44 @@
+name: Checks
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: ci
+          POSTGRES_PASSWORD: ci
+          POSTGRES_DB: audit_ci
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U ci -d audit_ci"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      DATABASE_URL: postgresql://ci:ci@localhost:5432/audit_ci
+      DIRECT_URL: postgresql://ci:ci@localhost:5432/audit_ci
+      AUDIT_DATABASE_URL: postgresql://ci:ci@localhost:5432/audit_ci
+      SESSION_SECRET: disposable-ci-only-session-secret-32-characters
+      NEXT_TELEMETRY_DISABLED: '1'
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          cache: npm
+      - run: npm ci
+      - run: npm run check
+      - run: npm run build
+      - run: npm run test:audit
