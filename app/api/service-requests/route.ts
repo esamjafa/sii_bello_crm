@@ -3,7 +3,7 @@ import { z } from 'zod';
 import { prisma } from '@/lib/prisma';
 import { currentUser } from '@/lib/auth';
 import { audit } from '@/lib/audit';
-import { sendEmail, sendWhatsApp } from '@/lib/notifications';
+import { sendEmail } from '@/lib/notifications';
 import { assertNoOverlap, schedulingTransaction, SchedulingConflict } from '@/lib/scheduling';
 
 const createSchema=z.object({serviceId:z.string().min(1),preferredAt:z.string().datetime(),notes:z.string().trim().max(1000).optional().nullable()});
@@ -17,7 +17,7 @@ export async function GET() {
     if (!user.customerId) return NextResponse.json({error:'Customer account is not linked'},{status:403});
     return NextResponse.json(await prisma.serviceRequest.findMany({where:{customerId:user.customerId},include:{service:true},orderBy:{createdAt:'desc'}}));
   }
-  if (!managementRoles.includes(user.role) && user.role!=='STAFF' && user.role!=='VIEWER') return NextResponse.json({error:'Forbidden'},{status:403});
+  if (!managementRoles.includes(user.role)) return NextResponse.json({error:'Forbidden'},{status:403});
   return NextResponse.json(await prisma.serviceRequest.findMany({include:{customer:true,service:true,reviewedBy:{select:{name:true}}},orderBy:{createdAt:'desc'},take:500}));
 }
 
@@ -35,7 +35,6 @@ export async function POST(request:Request) {
   if (preferredAt.getTime()<Date.now()) return NextResponse.json({error:'Requested time must be in the future'},{status:400});
   const created=await prisma.serviceRequest.create({data:{customerId:customer.id,serviceId:service.id,preferredAt,notes:parsed.data.notes},include:{service:true}});
   await audit(user,'CREATE','serviceRequests',created.id,{serviceId:service.id,preferredAt});
-  await sendWhatsApp(created.id,process.env.SALON_WHATSAPP_NUMBER??'','REQUEST_CREATED',process.env.WHATSAPP_NEW_REQUEST_TEMPLATE||'new_service_request',[customer.name,service.name,preferredAt.toLocaleString('en-IL')]);
   return NextResponse.json(created);
 }
 
@@ -60,8 +59,9 @@ export async function PATCH(request:Request) {
       await assertNoOverlap(tx,existing.preferredAt,existing.service.durationMinutes);
       const appointment=await tx.appointment.create({data:{customerId:existing.customerId,serviceId:existing.serviceId,startsAt:existing.preferredAt,status:'SCHEDULED',notes:existing.notes}});
       appointmentId=appointment.id;
-      const invoice=await tx.invoice.create({data:{customerId:existing.customerId,serviceId:existing.serviceId,description:`Appointment: ${existing.service.name}`,amount:existing.service.price,paidAmount:0,status:'UNPAID',dueAt:existing.preferredAt}});
+      const invoice=await tx.invoice.create({data:{customerId:existing.customerId,serviceId:existing.serviceId,description:`Appointment: ${existing.service.name}`,originalAmount:existing.service.price,amount:existing.service.price,paidAmount:0,status:'UNPAID',dueAt:existing.preferredAt}});
       invoiceId=invoice.id;
+      await tx.appointment.update({where:{id:appointment.id},data:{invoiceId:invoice.id}});
     }
     return tx.serviceRequest.update({where:{id:existing.id},data:{appointmentId,invoiceId},include:{customer:true,service:true}});
   });
@@ -75,21 +75,9 @@ export async function PATCH(request:Request) {
   const appointmentDetails=`${result.preferredAt.toLocaleString('en-IL',{timeZone:'Asia/Jerusalem'})} · ${result.service.durationMinutes} minutes · ₪${Number(result.service.price)}`;
   const message=`Your request for ${result.service.name} was ${status}. ${appointmentDetails}.${result.adminNote?` Note: ${result.adminNote}`:''}`;
   await Promise.all([
-    sendWhatsApp(result.id,result.customer.phone,'REQUEST_REVIEWED',process.env.WHATSAPP_REQUEST_RESULT_TEMPLATE||'service_request_result',[result.customer.name,result.service.name,status,appointmentDetails]),
     sendEmail(result.id,result.customer.email??'','REQUEST_REVIEWED',`Sii Bello Saloon request ${status}`,message)
   ]);
   return NextResponse.json(result);
 }
 
-export async function DELETE(request:Request){
-  const user=await currentUser();
-  if(!user)return NextResponse.json({error:'Unauthorized'},{status:401});
-  if(!['GOD','ADMIN'].includes(user.role))return NextResponse.json({error:'Only Admin or God Mode can delete requests'},{status:403});
-  const body=await request.json().catch(()=>({}));
-  if(typeof body.id!=='string'||!body.id)return NextResponse.json({error:'Missing id'},{status:400});
-  const existing=await prisma.serviceRequest.findUnique({where:{id:body.id},select:{id:true}});
-  if(!existing)return NextResponse.json({error:'Request not found'},{status:404});
-  await prisma.$transaction([prisma.notificationLog.deleteMany({where:{serviceRequestId:body.id}}),prisma.serviceRequest.delete({where:{id:body.id}})]);
-  await audit(user,'DELETE','serviceRequests',body.id);
-  return NextResponse.json({ok:true});
-}
+export async function DELETE(){return NextResponse.json({error:'الحذف غير مسموح؛ يُحفظ سجل الطلبات'},{status:405});}

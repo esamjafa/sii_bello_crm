@@ -1,0 +1,2 @@
+ALTER TABLE "Product" ADD COLUMN "imageBytes" BYTEA, ADD COLUMN "imageMime" TEXT;
+ALTER TABLE "LaserPlan" ADD COLUMN "category" TEXT NOT NULL DEFAULT 'LASER';

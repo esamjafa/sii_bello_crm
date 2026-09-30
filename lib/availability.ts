@@ -15,12 +15,12 @@ export async function availableSlots(serviceId:string,date:string){
   const dayOfWeek=new Date(`${date}T12:00:00Z`).getUTCDay();
   const hours=await prisma.workingHour.findUnique({where:{dayOfWeek}});if(!hours?.active)return [];
   const open=zonedDate(date,hours.openTime),close=zonedDate(date,hours.closeTime);
-  const appointments=await prisma.appointment.findMany({where:{startsAt:{lt:close},status:{in:['SCHEDULED','COMPLETED']}},include:{service:true}});
+  const appointments=await prisma.appointment.findMany({where:{startsAt:{lt:close},archivedAt:null,status:{in:['SCHEDULED','PENDING_REPLY','CONFIRMED','COMPLETED']}},include:{service:true}});
   const duration=service.durationMinutes*60000,slots:string[]=[];
   for(let start=open.getTime();start+duration<=close.getTime();start+=30*60000){
     if(start<Date.now()+30*60000)continue;
     const end=start+duration;
-    const conflict=appointments.some(a=>{const aStart=a.startsAt.getTime(),aEnd=aStart+a.service.durationMinutes*60000;return start<aEnd&&end>aStart;});
+    const conflict=appointments.some(a=>{const aStart=a.startsAt.getTime(),aEnd=aStart+(a.durationMinutes??a.service.durationMinutes)*60000;return start<aEnd&&end>aStart;});
     if(!conflict)slots.push(new Date(start).toISOString());
   }
   return slots;

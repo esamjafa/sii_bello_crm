@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server';
 import { prisma } from '@/lib/prisma';
 import { currentUser } from '@/lib/auth';
+import { allowed, customerScope } from '@/lib/crm-access';
 
 export async function GET(_request: Request, context: { params: Promise<{ id: string }> }) {
   const user = await currentUser();
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-  if (!['GOD', 'ADMIN', 'MANAGER', 'STAFF', 'VIEWER'].includes(user.role)) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
+  if (!allowed(user,'documents')) return NextResponse.json({ error: 'Forbidden' }, { status: 403 });
   const { id } = await context.params;
-  const document = await prisma.laserDocument.findUnique({ where: { id } });
+  const document = await prisma.laserDocument.findFirst({ where: { id, plan:{customer:customerScope(user)} } });
   if (!document) return NextResponse.json({ error: 'Not found' }, { status: 404 });
   const filename = document.filename.replace(/[\x00-\x1f\x7f"\\/]/g, '_');
   const fallback = filename.replace(/[^\x20-\x7e]/g, '_');

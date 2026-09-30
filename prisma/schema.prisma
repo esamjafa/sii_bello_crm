@@ -8,6 +8,13 @@ datasource db {
 }
 
 enum Role {
+  ACCOUNTANT
+  RECEPTIONIST
+  SALES
+  COLLEGE
+  TRAINER
+  EVENT_MANAGER
+  INVENTORY
   GOD
   ADMIN
   MANAGER
@@ -16,6 +23,8 @@ enum Role {
   CUSTOMER
 }
 enum AppointmentStatus {
+  PENDING_REPLY
+  CONFIRMED
   SCHEDULED
   COMPLETED
   CANCELLED
@@ -33,6 +42,13 @@ enum ExpenseStatus {
 }
 
 model User {
+  staffId String? @unique
+  staff Staff? @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  assignedCustomers Customer[] @relation("CustomerOwner")
+  tasks Task[] @relation("TaskOwner")
+  managedEvents Event[]
+  courses CollegeCourse[]
+  sessionVersion Int @default(0)
   id String @id @default(cuid())
   username String @unique
   email String? @unique
@@ -53,6 +69,27 @@ model User {
 }
 
 model Customer {
+  city String?
+  country String @default("IL")
+  departments String[] @default(["SALON"])
+  source String @default("OTHER")
+  ownerId String?
+  owner User? @relation("CustomerOwner", fields: [ownerId], references: [id], onDelete: SetNull)
+  lastContactAt DateTime?
+  archivedAt DateTime?
+  allergies String?
+  photoConsent Boolean @default(false)
+  serviceConsent Boolean @default(false)
+  careInstructions String?
+  interestedIn String?
+  tasks Task[]
+  entries CustomerNote[]
+  documents CustomerDocument[]
+  students Student[]
+  eventLeads EventLead[]
+  hairSessions HairSession[]
+  stockMovements StockMovement[]
+  @@index([ownerId, archivedAt])
   id String @id @default(cuid())
   name String
   phone String @unique
@@ -70,6 +107,7 @@ model Customer {
 }
 
 model Service {
+  department String @default("SALON")
   id String @id @default(cuid())
   name String
   price Decimal
@@ -152,6 +190,13 @@ model NotificationLog {
 }
 
 model Staff {
+  department String @default("SALON")
+  services String[] @default([])
+  schedule String?
+  commissionRate Decimal @default(0)
+  user User?
+  leaves EmployeeLeave[]
+  hairSessions HairSession[]
   id String @id @default(cuid())
   name String
   phone String?
@@ -163,6 +208,13 @@ model Staff {
 }
 
 model Appointment {
+  durationMinutes Int?
+  price Decimal?
+  archivedAt DateTime?
+  nextFollowUpAt DateTime?
+  sessionNotes String?
+  invoiceId String? @unique
+  invoice Invoice? @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
   id String @id @default(cuid())
   customerId String
   customer Customer @relation(fields:[customerId], references:[id], onDelete:Restrict)
@@ -178,6 +230,20 @@ model Appointment {
 }
 
 model Invoice {
+  notes String?
+  documents CustomerDocument[]
+  originalAmount Decimal @default(0)
+  discount Decimal @default(0)
+  discountReason String?
+  currency String @default("ILS")
+  department String @default("SALON")
+  cancelledAt DateTime?
+  cancelReason String?
+  payments Payment[]
+  appointment Appointment?
+  enrollment StudentEnrollment?
+  eventLead EventLead?
+  stockMovements StockMovement[]
   id String @id @default(cuid())
   customerId String
   customer Customer @relation(fields:[customerId], references:[id], onDelete:Restrict)
@@ -206,6 +272,18 @@ model Expense {
 }
 
 model CollegeCourse {
+  coordinatorId String?
+  trainerId String?
+  trainer User? @relation(fields: [trainerId], references: [id], onDelete: SetNull)
+  groupName String?
+  startsAt DateTime?
+  endsAt DateTime?
+  hours Int @default(0)
+  capacity Int @default(20)
+  includedKit String?
+  cost Decimal @default(0)
+  status String @default("UPCOMING")
+  sessions CourseSession[]
   id String @id @default(cuid())
   title String
   category String @default("COSMETIC")
@@ -217,6 +295,19 @@ model CollegeCourse {
 }
 
 model Student {
+  requiredDocuments String[] @default([])
+  receivedDocuments String[] @default([])
+  collegeService String @default("CONSULTATION")
+  customerId String?
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  interestedCourse String?
+  interest String @default("MEDIUM")
+  objection String?
+  quotedPrice Decimal @default(0)
+  offeredDiscount Decimal @default(0)
+  notRegisteredReason String?
+  archivedAt DateTime?
+  @@index([customerId])
   id String @id @default(cuid())
   name String
   phone String @unique
@@ -230,6 +321,14 @@ model Student {
 }
 
 model StudentEnrollment {
+  status String @default("REGISTERED")
+  invoiceId String? @unique
+  invoice Invoice? @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  certificateStatus String @default("PENDING")
+  kitReceivedAt DateTime?
+  trainerNotes String?
+  attendance Attendance[]
+  archivedAt DateTime?
   id String @id @default(cuid())
   studentId String
   student Student @relation(fields:[studentId], references:[id], onDelete:Restrict)
@@ -243,6 +342,8 @@ model StudentEnrollment {
 }
 
 model StudentPayment {
+  voidedAt DateTime?
+  voidReason String?
   id String @id @default(cuid())
   enrollmentId String
   enrollment StudentEnrollment @relation(fields:[enrollmentId], references:[id], onDelete:Restrict)
@@ -266,6 +367,12 @@ model StudentContact {
 }
 
 model Event {
+  capacity Int @default(0)
+  managerId String?
+  manager User? @relation(fields: [managerId], references: [id], onDelete: SetNull)
+  currency String @default("AED")
+  depositRequired Decimal @default(0)
+  archivedAt DateTime?
   id String @id @default(cuid())
   name String
   location String?
@@ -288,6 +395,30 @@ model EventPackage {
 }
 
 model EventLead {
+  partySize Int @default(1)
+  customerId String?
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  invoiceId String? @unique
+  invoice Invoice? @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  originalPrice Decimal @default(0)
+  discount Decimal @default(0)
+  discountReason String?
+  currency String @default("AED")
+  nextPaymentAt DateTime?
+  vip Boolean @default(false)
+  flight Boolean @default(false)
+  flightDetails String?
+  transferDetails String?
+  hotel Boolean @default(false)
+  hotelName String?
+  roomType String?
+  companion String?
+  certificate Boolean @default(false)
+  certificateStatus String @default("PENDING")
+  specialNeeds String?
+  attended Boolean @default(false)
+  archivedAt DateTime?
+  @@index([customerId])
   id String @id @default(cuid())
   eventId String?
   event Event? @relation(fields:[eventId], references:[id], onDelete:SetNull)
@@ -319,6 +450,9 @@ model EventContact {
 }
 
 model LaserPlan {
+  category String @default("LASER")
+  price Decimal @default(0)
+  archivedAt DateTime?
   id String @id @default(cuid())
   customerId String
   customer Customer @relation(fields:[customerId], references:[id], onDelete:Restrict)
@@ -333,6 +467,12 @@ model LaserPlan {
 }
 
 model LaserSession {
+  device String?
+  settings String?
+  skinHairNotes String?
+  contraindications String?
+  nextSessionAt DateTime?
+  archivedAt DateTime?
   id String @id @default(cuid())
   planId String
   plan LaserPlan @relation(fields:[planId], references:[id], onDelete:Restrict)
@@ -352,4 +492,178 @@ model LaserDocument {
   content Bytes
   createdAt DateTime @default(now())
   @@index([planId])
+}
+
+model Task {
+  id String @id @default(cuid())
+  customerId String
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  ownerId String
+  owner User @relation("TaskOwner", fields: [ownerId], references: [id], onDelete: Restrict)
+  contactedAt DateTime @default(now())
+  channel String @default("PHONE")
+  reason String
+  summary String?
+  outcome String @default("NEW")
+  nextAction String?
+  dueAt DateTime?
+  priority String @default("NORMAL")
+  completedAt DateTime?
+  archivedAt DateTime?
+  createdById String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  @@index([ownerId, dueAt, completedAt])
+  @@index([customerId])
+}
+model CustomerNote {
+  department String @default("SALON")
+  id String @id @default(cuid())
+  customerId String
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  body String
+  authorId String
+  authorName String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+model CustomerDocument {
+  invoiceId String?
+  invoice Invoice? @relation(fields:[invoiceId], references:[id], onDelete:Restrict)
+  department String @default("SALON")
+  id String @id @default(cuid())
+  customerId String
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  filename String
+  mimeType String
+  content Bytes
+  category String @default("DOCUMENT")
+  authorId String
+  createdAt DateTime @default(now())
+  @@index([customerId])
+}
+model Payment {
+  id String @id @default(cuid())
+  invoiceId String
+  invoice Invoice @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  amount Decimal
+  kind String @default("PAYMENT")
+  paidAt DateTime @default(now())
+  method String @default("CASH")
+  receivedById String?
+  notes String?
+  receiptDocumentId String?
+  voidedAt DateTime?
+  voidedById String?
+  voidReason String?
+  idempotencyKey String @unique
+  createdAt DateTime @default(now())
+  @@index([invoiceId, paidAt])
+}
+model Product {
+  imageBytes Bytes?
+  imageMime String?
+  id String @id @default(cuid())
+  name String
+  imageUrl String?
+  category String
+  supplier String?
+  purchasePrice Decimal @default(0)
+  salePrice Decimal @default(0)
+  currency String @default("ILS")
+  minimum Int @default(0)
+  storageLocation String?
+  purpose String @default("SALE")
+  archivedAt DateTime?
+  movements StockMovement[]
+  orders SupplierOrder[]
+}
+model StockMovement {
+  id String @id @default(cuid())
+  productId String
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  customerId String?
+  customer Customer? @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  invoiceId String?
+  invoice Invoice? @relation(fields: [invoiceId], references: [id], onDelete: Restrict)
+  kind String
+  quantity Int
+  batch String
+  expiresAt DateTime?
+  reason String
+  actorId String
+  idempotencyKey String @unique
+  createdAt DateTime @default(now())
+  @@index([productId, batch])
+}
+model SupplierOrder {
+  id String @id @default(cuid())
+  productId String
+  product Product @relation(fields: [productId], references: [id], onDelete: Restrict)
+  supplier String
+  quantity Int
+  expectedAt DateTime
+  status String @default("PENDING")
+  notes String?
+}
+model CourseSession {
+  id String @id @default(cuid())
+  courseId String
+  course CollegeCourse @relation(fields: [courseId], references: [id], onDelete: Restrict)
+  title String
+  startsAt DateTime
+  endsAt DateTime
+  attendance Attendance[]
+}
+model Attendance {
+  id String @id @default(cuid())
+  sessionId String
+  session CourseSession @relation(fields: [sessionId], references: [id], onDelete: Restrict)
+  enrollmentId String
+  enrollment StudentEnrollment @relation(fields: [enrollmentId], references: [id], onDelete: Restrict)
+  status String @default("PRESENT")
+  grade Int?
+  notes String?
+  @@unique([sessionId, enrollmentId])
+}
+model HairSession {
+  id String @id @default(cuid())
+  customerId String
+  customer Customer @relation(fields: [customerId], references: [id], onDelete: Restrict)
+  staffId String?
+  staff Staff? @relation(fields: [staffId], references: [id], onDelete: SetNull)
+  service String
+  diagnosis String?
+  materials String?
+  quantities String?
+  result String?
+  homeCare String?
+  performedAt DateTime @default(now())
+  renewalAt DateTime?
+  archivedAt DateTime?
+}
+model EmployeeLeave {
+  id String @id @default(cuid())
+  staffId String
+  staff Staff @relation(fields: [staffId], references: [id], onDelete: Restrict)
+  startsAt DateTime
+  endsAt DateTime
+  reason String
+  status String @default("PENDING")
+}
+model MessageTemplate {
+  id String @id @default(cuid())
+  name String
+  body String
+  department String @default("SALON")
+  active Boolean @default(true)
+}
+model Reminder {
+  id String @id @default(cuid())
+  taskId String
+  dueAt DateTime
+  status String @default("PENDING")
+  attemptedAt DateTime?
+  error String?
+  @@unique([taskId, dueAt])
 }

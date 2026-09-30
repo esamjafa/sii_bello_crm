@@ -1,5 +1,63 @@
 # Vercel deployment
 
+## Production — 26 September 2026
+
+Published the current CRM workspace with Meta-only WhatsApp integration to
+https://sii-bello.vercel.app using Vercel CLI 60.0.0.
+Deployment: `dpl_7ZWdJvqV1SbtyJ3Gmgfsc9vR3BgJ` (READY).
+Deployment URL: https://sii-bello-i61j4asx9-esamjafas-projects.vercel.app
+
+The production database reported all four migrations applied; no database changes
+were needed. Production secure cookies are enabled, development OTP display is
+disabled, and the session secret meets the length requirement. Vercel's production
+build passed. The preceding local regression run passed 643/643 checks
+(`audit-results/crm-1790409459482/results.json`).
+
+Live public checks verified `/` redirects to `/login`, `/login` and `/book` return
+200, and anonymous requests to `/api/crm/dashboard`, `/api/crm/customers`, and
+`/api/booking/data` return 401. All checked responses include frame protection.
+Authenticated business workflows were not retested on this deployment.
+Meta credentials are not configured in Production, so WhatsApp delivery remains
+inactive. Local secret files and backups were excluded from the deployment.
+
+## Production — 24 September 2026
+
+Live website: https://sii-bello.vercel.app
+
+On 25 September 2026, `sii-bello.vercel.app` was attached as a production
+project domain and assigned to the deployment below. Public checks verified
+that `/` redirects to `/login`, and `/login` and `/book` return HTTP 200
+without Vercel SSO. The previous `sii-bello-crm.vercel.app` address remains available.
+
+Deployment `dpl_ZorXM9DKNnGdnNo69VAVaty3CK4P` completed successfully with
+Vercel CLI 59.26.0. The approved production database connections and session
+secret are configured, secure cookies are enabled, and development OTP display
+is disabled. Prisma reports the production database schema is up to date.
+
+Public HTTP checks verified `/` redirects to `/login`, and `/login` and `/book`
+return HTTP 200 without Vercel SSO. Existing-account login and logout both
+returned HTTP 200; the session cookie has Secure and HttpOnly flags.
+Customer-record retrieval was not tested because automatic approval review
+rejected that check; verification used public pages and login/logout instead.
+WhatsApp and email provider credentials remain unconfigured, so phone-code
+delivery and outbound notifications are not operational.
+
+## Verification — 24 September 2026
+
+Vercel reports the existing preview deployment as **Ready**:
+https://sii-bello-jb26up23d-esamjafas-projects.vercel.app
+
+The linked project is `sii-bello-crm`. Its Preview environment contains the five
+required application variables listed below. Local `npm run check` and
+`npm run build` passed again on 24 September 2026.
+
+Unauthenticated HTTP checks of `/`, `/login`, `/book`, and
+`/api/data/customers` all returned HTTP 302 to Vercel's SSO sign-in gate.
+These checks verify deployment protection, but do not verify application routes,
+database access, login, or booking. Sign in to Vercel with project access before
+performing hosted application checks. No new deployment or production release
+was performed during this verification.
+
 `vercel.json` selects the Next.js preset, `npm ci`, and `npm run build`.
 The build generates Prisma Client and builds Next.js; it does not migrate or seed a database.
 

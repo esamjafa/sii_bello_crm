@@ -9,8 +9,9 @@ function secret() {
   if (!value || value.length < 32) throw new Error('SESSION_SECRET must be at least 32 characters');
   return new TextEncoder().encode(value);
 }
-export async function setSession(userId: string) {
-  const token = await new SignJWT({ sub: userId }).setProtectedHeader({ alg: 'HS256' }).setIssuedAt().setExpirationTime('7d').sign(secret());
+export async function setSession(userId: string, version?:number) {
+  const sessionVersion=version??(await prisma.user.findUniqueOrThrow({where:{id:userId},select:{sessionVersion:true}})).sessionVersion;
+  const token = await new SignJWT({ sub: userId, version:sessionVersion }).setProtectedHeader({ alg: 'HS256' }).setIssuedAt().setExpirationTime('7d').sign(secret());
   (await cookies()).set(cookieName, token, { httpOnly: true, secure: process.env.NODE_ENV === 'production' || process.env.FORCE_SECURE_COOKIES === 'true', sameSite: 'lax', path: '/', maxAge: 604800 });
 }
 export async function clearSession() { (await cookies()).delete(cookieName); }
@@ -20,7 +21,9 @@ export async function currentUser() {
     if (!token) return null;
     const { payload } = await jwtVerify(token, secret());
     if (!payload.sub) return null;
-    return await prisma.user.findFirst({ where: { id: payload.sub, active: true }, select: { id: true, name: true, username: true, email: true, role: true, customerId: true } });
+    const user = await prisma.user.findFirst({ where: { id: payload.sub, active: true, requiresGodUnlock:false, OR:[{lockedUntil:null},{lockedUntil:{lte:new Date()}}] }, select: { id: true, name: true, username: true, email: true, role: true, customerId: true, staffId:true, sessionVersion:true } });
+    if(!user || (payload.version??0)!==user.sessionVersion)return null;
+    return user;
   } catch { return null; }
 }
 export function canWrite(role: Role, resource: string) {

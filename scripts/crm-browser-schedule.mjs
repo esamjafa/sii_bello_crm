@@ -1,0 +1,9 @@
+import {resolve} from 'node:path';
+export async function verifyScheduleEditor({browser,base,cookies,db,check,output}){
+ const context=await browser.newContext({viewport:{width:820,height:1180}});await context.addCookies([{name:'salon_session',value:cookies.ADMIN,domain:'localhost',path:'/'}]);const page=await context.newPage();await page.goto(base);
+ await page.getByRole('navigation').getByRole('button',{name:'الموظفون',exact:false}).click();await page.getByRole('textbox',{name:'بحث في القائمة'}).fill('دوام فترتين');await page.locator('.crm-table tbody tr').filter({hasText:'دوام فترتين'}).getByRole('button',{name:'تعديل',exact:true}).click();const modal=page.getByRole('dialog');await modal.getByRole('button',{name:'فترات الدوام',exact:true}).click();
+ check('Staff editor shows separate periods',await modal.getByLabel('الأحد بداية 1',{exact:true}).inputValue()==='09:00'&&await modal.getByLabel('الأحد بداية 2',{exact:true}).inputValue()==='16:00');
+ await modal.getByLabel('الاثنين بداية 1',{exact:true}).fill('10:00');await modal.getByLabel('نسخ دوام الأحد',{exact:true}).selectOption('1');check('Copy working day updates target periods',await modal.getByLabel('الاثنين بداية 1',{exact:true}).inputValue()==='09:00');
+ await page.screenshot({path:resolve(output,'staff-split-shifts-820.png'),fullPage:true});await modal.getByRole('button',{name:'حفظ',exact:true}).click();await modal.waitFor({state:'hidden'});const staff=await db.staff.findFirst({where:{name:'دوام فترتين'}});check('Browser staff periods persist',JSON.parse(staff.schedule)['1'].length===2&&JSON.parse(staff.schedule)['1'][0].start==='09:00');
+ await page.getByRole('switch').click();await page.reload();await page.getByRole('switch',{checked:true}).waitFor();check('Previous color palette persists after reload',await page.locator('.crm-app').getAttribute('data-theme')==='legacy');await context.close();
+}

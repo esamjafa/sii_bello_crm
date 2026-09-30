@@ -1,0 +1,76 @@
+/* Screenshot reference: warm ivory, dark plum sidebar and dusty rose accents. */
+.crm-theme-toggle{display:flex;align-items:center;gap:7px;white-space:nowrap;flex-shrink:0}
+.crm-theme-toggle>span:first-child{font-size:20px;line-height:1}
+@media(max-width:1100px){.crm-theme-label{display:none}.crm-app .crm-theme-toggle{padding:9px}}
+@media(max-width:760px){.crm-topbar{gap:6px}}
+.crm-app[data-theme=legacy]{--ink:#352e38;--muted:#756570;--line:#e9dfe2;--green:#9f6072;--surface:#fff;--raised:#f9f3f4;--accent:#a96878;background:#faf8f6;color-scheme:light}
+.crm-app[data-theme=legacy] button:hover{background:#f8eeee}
+.crm-app[data-theme=legacy] :is(input,textarea,select):focus,.crm-app[data-theme=legacy] button:focus-visible{outline-color:#bb8190}
+.crm-app[data-theme=legacy] :is(input,textarea)::placeholder{color:#756570}
+.crm-app[data-theme=legacy] .crm-sidebar{background:#342d39}
+.crm-app[data-theme=legacy] :is(.crm-brand span,.crm-account small){color:#c9bac5}
+.crm-app[data-theme=legacy] .crm-sidebar nav button{color:#cfc5cf}
+.crm-app[data-theme=legacy] .crm-sidebar nav button:is(.active,:hover){background:#51424f;color:#fff}
+.crm-app[data-theme=legacy] .crm-sidebar nav b{background:#edd8d2;color:#543d4d}
+.crm-app[data-theme=legacy] .crm-account button{color:#cfc5cf;border-color:#766373;background:transparent}
+.crm-app[data-theme=legacy] .crm-search>input{background:#fff}
+.crm-app[data-theme=legacy] .crm-eyebrow{color:#9f6072}
+.crm-app[data-theme=legacy] .crm-primary{background:#a96878;color:#fff;border-color:#a96878}
+.crm-app[data-theme=legacy] .crm-primary:hover{background:#985b6d}
+.crm-app[data-theme=legacy] .crm-table th{background:#fbf9f8}
+.crm-app[data-theme=legacy] .crm-table tbody tr:hover{background:#f9f3f4}
+.crm-app[data-theme=legacy] .crm-tabs button.active{background:#f4e7e8;color:#9f6072}
+.crm-app[data-theme=legacy] .crm-profile-head{background:#f4ebed}
+.crm-app[data-theme=legacy] .crm-dialog::backdrop{background:#2b2229a8}
+.crm-app[data-theme=legacy] :is(.crm-required,.crm-overdue,.crm-danger){color:#a3362a}
+.crm-app[data-theme=legacy] .crm-badge.green{background:#e2f0e3;color:#256037}
+.crm-app[data-theme=legacy] .crm-badge.red{background:#f9e4e1;color:#a53629}
+.crm-app[data-theme=legacy] .crm-badge.blue{background:#e0ebf7;color:#315e92}
+.crm-app[data-theme=legacy] .crm-badge.purple{background:#eee5f6;color:#785096}
+.crm-app[data-theme=legacy] .crm-badge.gray{background:#f2eeee;color:#655b63}
+.crm-app[data-theme=legacy] .crm-badge.amber{background:#fbefd7;color:#795618}
+.crm-app[data-theme=legacy] .crm-alert{background:#fff0ed;border-color:#efc5be;color:#8f3428}
+.crm-app[data-theme=legacy] .crm-notice{background:#e6f3e5;border-color:#b9d2b8;color:#28532e}
+.crm-app[data-theme=legacy] .crm-avatar{background:#edd8d2;color:#795d61}
+.crm-app[data-theme=legacy] .crm-seat-count{background:#f4e7e8;color:#9f6072}
+
+/* Final CRM identity: calm lilac surfaces, plum text and restrained pink accents. */
+.crm-app:not([data-theme=legacy]){--ink:#352b43;--muted:#6c6078;--line:#e2d9eb;--green:#765396;--surface:#fff;--raised:#f4eef9;--accent:#885ca5;background:#f8f5fb;color-scheme:light}
+.crm-app:not([data-theme=legacy]) .crm-sidebar{background:#3e2e50}
+.crm-app:not([data-theme=legacy]) .crm-sidebar nav button{color:#e7daef}
+.crm-app:not([data-theme=legacy]) .crm-sidebar nav button:is(.active,:hover){background:#614674;color:#fff}
+.crm-app:not([data-theme=legacy]) :is(.crm-brand span,.crm-account small){color:#dfcce9}
+.crm-app:not([data-theme=legacy]) .crm-account button{color:#fff;background:transparent;border-color:#9e81af}
+.crm-app:not([data-theme=legacy]) .crm-primary{background:#795294;color:#fff;border-color:#795294}
+.crm-app:not([data-theme=legacy]) .crm-primary:hover{background:#66427f}
+.crm-app:not([data-theme=legacy]) button:hover{background:#ece2f3}
+.crm-app:not([data-theme=legacy]) .crm-primary:hover{background:#66427f}
+.crm-app:not([data-theme=legacy]) .crm-eyebrow{color:#7a548f}
+.crm-app:not([data-theme=legacy]) .crm-seat-count{background:#efdfef;color:#764968}
+.crm-app:not([data-theme=legacy]) .crm-search>input{background:#efe7f5}
+.crm-app:not([data-theme=legacy]) :is(input,textarea)::placeholder{color:#796a86}
+.crm-app:not([data-theme=legacy]) :is(input,textarea,select):focus,.crm-app:not([data-theme=legacy]) button:focus-visible{outline-color:#b491c8}
+.crm-app:not([data-theme=legacy]) .crm-table th{background:#f1eaf6;color:#584369}
+.crm-app:not([data-theme=legacy]) .crm-table tbody tr:hover{background:#faf6fd}
+.crm-app:not([data-theme=legacy]) .crm-profile-head{background:#efe4f4}
+.crm-app:not([data-theme=legacy]) .crm-tabs button.active{background:#eadcf2;color:#65447e}
+.crm-app:not([data-theme=legacy]) .crm-badge.green{background:#e4f1e7;color:#25643b}
+.crm-app:not([data-theme=legacy]) .crm-badge.red{background:#fbe6eb;color:#9f2947}
+.crm-app:not([data-theme=legacy]) .crm-badge.blue{background:#e6edf9;color:#315589}
+.crm-app:not([data-theme=legacy]) .crm-badge.purple{background:#eee0f8;color:#71478d}
+.crm-app:not([data-theme=legacy]) .crm-badge.amber{background:#fff0d9;color:#79561c}
+.crm-app:not([data-theme=legacy]) .crm-badge.gray{background:#eeebf0;color:#655c6c}
+.crm-app:not([data-theme=legacy]) .crm-alert{background:#fff0f4;color:#932b4d;border-color:#edbed0}
+.crm-app:not([data-theme=legacy]) .crm-notice{background:#efe5f5;color:#5d3876;border-color:#d7bee7}
+.crm-app:not([data-theme=legacy]) :is(.crm-overdue,.crm-required,.crm-danger){color:#a12f53}
+.crm-app .crm-form-grid>label{font-size:15px}
+.crm-app .crm-table td{font-size:14px}
+@media(max-width:760px){.crm-table-wrap::before{content:'اسحبي الجدول أفقيًا لعرض بقية التفاصيل والإجراءات';display:block;font-size:12px;color:var(--muted);padding:8px}}
+.crm-shifts{border:1px solid var(--line);border-radius:10px;padding:12px;min-width:0}
+.crm-shift-day{border-top:1px solid var(--line);padding:12px 0;display:grid;gap:8px}
+.crm-shift-day .crm-inline{flex-wrap:wrap}.crm-shift-day input[type=time]{width:125px}
+.crm-upload-preview{padding:14px;border:1px solid var(--line);border-radius:10px;margin-top:12px}
+.crm-upload-preview img{display:block;max-width:100%;max-height:280px;border-radius:8px;margin-bottom:12px}
+.crm-slots{display:flex;flex-wrap:wrap;gap:8px;max-height:180px;overflow:auto}
+.crm-invoice-total{padding:14px;background:var(--raised);border-radius:10px;font-weight:700}
+.crm-dialog .crm-tabs span{padding:9px;border-radius:8px}.crm-dialog .crm-tabs span.active{background:var(--raised);font-weight:700}

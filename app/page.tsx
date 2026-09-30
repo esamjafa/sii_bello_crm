@@ -1,6 +1,6 @@
 import { redirect } from 'next/navigation';
 import { currentUser } from '@/lib/auth';
-import Workspace from '@/components/Workspace';
+import Workspace from '@/components/CrmWorkspace';
 import CustomerPortal from '@/components/CustomerPortal';
 import { bookingCustomerId } from '@/lib/booking-auth';
 export const dynamic = 'force-dynamic';

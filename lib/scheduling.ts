@@ -1,5 +1,6 @@
 import { Prisma } from '@prisma/client';
 import { prisma } from './prisma';
+import { parseSchedule, withinSchedule } from './staff-schedule';
 
 export class SchedulingConflict extends Error {}
 
@@ -35,15 +36,28 @@ export async function schedulingTransaction<T>(operation: (tx: Prisma.Transactio
   }
 }
 
-// Preserve the existing single-salon capacity rule: appointments conflict even
-// when different staff members are selected.
-export async function assertNoOverlap(tx: Prisma.TransactionClient, startsAt: Date, durationMinutes: number, excludeId?: string) {
+export async function assertStaffAvailable(tx:Prisma.TransactionClient,staffId:string,startsAt:Date,durationMinutes:number){
+ const staff=await tx.staff.findUnique({where:{id:staffId}});
+ if(!staff?.active)throw new SchedulingConflict('الموظفة غير متاحة');
+ let schedule;try{schedule=parseSchedule(staff.schedule);}catch{throw new SchedulingConflict('يجب تحديث جدول الموظفة قبل الحجز');}
+ if(!schedule){
+  const localDate=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jerusalem',year:'numeric',month:'2-digit',day:'2-digit'}).format(startsAt);
+  const day=new Date(`${localDate}T12:00:00Z`).getUTCDay();const hours=await tx.workingHour.findUnique({where:{dayOfWeek:day}});
+  if(!hours?.active)throw new SchedulingConflict('لا توجد فترات عمل متاحة لهذا اليوم');
+  schedule={[day]:[{start:hours.openTime,end:hours.closeTime}]};
+ }
+ if(schedule&&!withinSchedule(schedule,startsAt,durationMinutes))throw new SchedulingConflict('الموعد خارج فترات دوام الموظفة');
+ const endsAt=new Date(+startsAt+durationMinutes*60000);
+ if(await tx.employeeLeave.findFirst({where:{staffId,status:'APPROVED',startsAt:{lt:endsAt},endsAt:{gt:startsAt}}}))throw new SchedulingConflict('الموظفة في إجازة أثناء الموعد');
+}
+// An unassigned booking reserves salon capacity; assigned bookings reserve their staff member.
+export async function assertNoOverlap(tx: Prisma.TransactionClient, startsAt: Date, durationMinutes: number, excludeId?: string,staffId?:string|null) {
   const end = startsAt.getTime() + durationMinutes * 60000;
   const appointments = await tx.appointment.findMany({
-    where: { ...(excludeId ? { id: { not: excludeId } } : {}), startsAt: { lt: new Date(end) }, status: { in: ['SCHEDULED', 'COMPLETED'] } },
+    where: { ...(excludeId ? { id: { not: excludeId } } : {}),...(staffId?{OR:[{staffId},{staffId:null}]}:{}),archivedAt:null, startsAt: { lt: new Date(end) }, status: { in: ['SCHEDULED','PENDING_REPLY','CONFIRMED', 'COMPLETED'] } },
     include: { service: true }
   });
-  if (appointments.some(a => startsAt.getTime() < a.startsAt.getTime() + a.service.durationMinutes * 60000)) {
-    throw new SchedulingConflict('This time overlaps another appointment. Choose another time.');
+  if (appointments.some(a => startsAt.getTime() < a.startsAt.getTime() + (a.durationMinutes??a.service.durationMinutes) * 60000)) {
+    throw new SchedulingConflict('الموعد يتداخل مع حجز قائم؛ اختاري وقتًا آخر');
   }
 }

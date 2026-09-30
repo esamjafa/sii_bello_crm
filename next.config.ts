@@ -13,6 +13,8 @@ const contentSecurityPolicy = [
   "frame-ancestors 'none'"
 ].join('; ');
 const nextConfig: NextConfig = {
+  // Keep simultaneous HTTP/HTTPS development and production builds isolated.
+  distDir: isProduction ? '.next' : process.env.npm_lifecycle_event === 'dev:https' ? '.next-dev-https' : '.next-dev',
   async headers() {
     return [{ source: '/:path*', headers: [
       { key: 'X-Content-Type-Options', value: 'nosniff' },

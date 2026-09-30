@@ -12,9 +12,7 @@ export function middleware(request: NextRequest) {
   }
 
   const origin = request.headers.get('origin');
-  const forwardedHost = request.headers.get('x-forwarded-host')?.split(',')[0]?.trim();
-  const forwardedProto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim();
-  const expectedOrigin = forwardedHost && forwardedProto ? `${forwardedProto}://${forwardedHost}` : request.nextUrl.origin;
+  const expectedOrigin = request.nextUrl.origin;
   if (origin && origin !== expectedOrigin) {
     return NextResponse.json({ error: 'Invalid request origin' }, { status: 403 });
   }

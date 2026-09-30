@@ -1,52 +1,35 @@
 import { NextResponse } from 'next/server';
 import { compare } from 'bcryptjs';
-import { prisma } from '@/lib/prisma';
 import { setSession } from '@/lib/auth';
-import { audit } from '@/lib/audit';
 import { securityRateLimit } from '@/lib/security';
-const MAX_ATTEMPTS=5;
-const LOCK_MINUTES=10;
-function businessDate(){return new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jerusalem',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());}
-export async function POST(request: Request) {
-  try {
-    const body = await request.json().catch(() => null);
-    if (!body || typeof body !== 'object' || Array.isArray(body)) return NextResponse.json({ error: 'Invalid request' }, { status: 400 });
-    const { username, password } = body;
-    const noStore = { 'Cache-Control':'no-store, max-age=0', Pragma:'no-cache' };
-    if (typeof username !== 'string' || typeof password !== 'string' || username.length > 254 || password.length > 200) return NextResponse.json({ error: 'Invalid credentials' }, { status: 400, headers:noStore });
-    const identity=username.trim();
-    const limit=await securityRateLimit({request,action:'LOGIN_ATTEMPT',identity:'login',windowMs:15*60*1000,maximum:30});
-    if(!limit.allowed)return NextResponse.json({error:'Too many login attempts. Try again later.'},{status:429,headers:{...noStore,'Retry-After':String(limit.retryAfter)}});
-    const user = await prisma.user.findFirst({ where: { OR: [{ username: identity }, { email: identity.toLowerCase() }] } });
-    if (!user?.active) return NextResponse.json({ error: 'Invalid credentials' }, { status: 401, headers:noStore });
-    if (user.requiresGodUnlock) {
-      await audit(user,'LOGIN_BLOCKED','session',user.id,{reason:'GOD_UNLOCK_REQUIRED'});
-      return NextResponse.json({ error: 'Account locked. God Mode must unlock it.', code:'GOD_UNLOCK_REQUIRED' }, { status: 423, headers:noStore });
+import { schedulingTransaction } from '@/lib/scheduling';
+export async function POST(request:Request){
+ const headers={'Cache-Control':'no-store, max-age=0',Pragma:'no-cache'};
+ try{
+  const body=await request.json().catch(()=>null);
+  if(!body||typeof body.username!=='string'||typeof body.password!=='string'||body.username.length>254||body.password.length>200)return NextResponse.json({error:'Invalid credentials'},{status:400,headers});
+  const limit=await securityRateLimit({request,action:'LOGIN_ATTEMPT',identity:'login',windowMs:15*60*1000,maximum:30});
+  if(!limit.allowed)return NextResponse.json({error:'Too many attempts'},{status:429,headers:{...headers,'Retry-After':String(limit.retryAfter)}});
+  const identity=body.username.trim();
+  const result=await schedulingTransaction(async tx=>{
+   const user=await tx.user.findFirst({where:{OR:[{username:identity},{email:identity.toLowerCase()}]}});
+   if(!user?.active)return {status:401,error:'Invalid credentials'};
+   if(user.requiresGodUnlock)return {status:423,error:'Account locked. God Mode must unlock it.',code:'GOD_UNLOCK_REQUIRED'};
+   if(user.lockedUntil&&user.lockedUntil>new Date())return {status:423,error:'Account temporarily locked',code:'TEMPORARY_LOCK',retryAfter:Math.ceil((+user.lockedUntil-Date.now())/1000)};
+   const log=async(action:string,details:unknown)=>tx.auditLog.create({data:{actorId:user.id,actorName:user.name,actorRole:user.role,action,entity:'session',entityId:user.id,details:JSON.stringify(details)}});
+   if(!await compare(body.password,user.passwordHash)){
+    const attempts=user.failedLoginAttempts+1;
+    if(attempts>=5){
+     const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jerusalem',year:'numeric',month:'2-digit',day:'2-digit'}).format(new Date());
+     const locks=user.lockCountDate===today?user.dailyLockCount+1:1;const god=locks>=3;
+     await tx.user.update({where:{id:user.id},data:{failedLoginAttempts:0,dailyLockCount:locks,lockCountDate:today,requiresGodUnlock:god,lockedUntil:god?null:new Date(Date.now()+600000),sessionVersion:{increment:1}}});
+     await log('ACCOUNT_LOCKED',{locks,requiresGodUnlock:god});return {status:423,error:god?'God Mode unlock required':'Account locked for 10 minutes',code:god?'GOD_UNLOCK_REQUIRED':'TEMPORARY_LOCK',retryAfter:600};
     }
-    if (user.lockedUntil && user.lockedUntil > new Date()) {
-      const retryAfter=Math.max(1,Math.ceil((user.lockedUntil.getTime()-Date.now())/1000));
-      await audit(user,'LOGIN_BLOCKED','session',user.id,{reason:'TEMPORARY_LOCK',retryAfter});
-      return NextResponse.json({ error: `Account locked. Try again in ${Math.ceil(retryAfter/60)} minute(s).`, code:'TEMPORARY_LOCK', retryAfter }, { status: 423, headers:{...noStore,'Retry-After':String(retryAfter)} });
-    }
-    const passwordMatches=await compare(password,user.passwordHash);
-    if (!passwordMatches) {
-      const attempts=user.failedLoginAttempts+1;
-      if (attempts>=MAX_ATTEMPTS) {
-        const today=businessDate();
-        const locksToday=user.lockCountDate===today?user.dailyLockCount+1:1;
-        const requiresGodUnlock=locksToday>=3;
-        const lockedUntil=requiresGodUnlock?null:new Date(Date.now()+LOCK_MINUTES*60*1000);
-        await prisma.user.update({where:{id:user.id},data:{failedLoginAttempts:0,dailyLockCount:locksToday,lockCountDate:today,requiresGodUnlock,lockedUntil}});
-        await audit(user,'ACCOUNT_LOCKED','users',user.id,{locksToday,requiresGodUnlock,lockedUntil});
-        return NextResponse.json({error:requiresGodUnlock?'Account locked. God Mode must unlock it.':`Account locked for ${LOCK_MINUTES} minutes.`,code:requiresGodUnlock?'GOD_UNLOCK_REQUIRED':'TEMPORARY_LOCK',retryAfter:requiresGodUnlock?undefined:LOCK_MINUTES*60},{status:423,headers:{...noStore,...(!requiresGodUnlock?{'Retry-After':String(LOCK_MINUTES*60)}:{})}});
-      }
-      await prisma.user.update({where:{id:user.id},data:{failedLoginAttempts:attempts,lockedUntil:null}});
-      await audit(user,'LOGIN_FAILED','session',user.id,{attempts,remaining:MAX_ATTEMPTS-attempts});
-      return NextResponse.json({ error: `Invalid credentials. ${MAX_ATTEMPTS-attempts} attempt(s) remaining.`, code:'INVALID_CREDENTIALS', remaining:MAX_ATTEMPTS-attempts }, { status: 401, headers:noStore });
-    }
-    await prisma.user.update({where:{id:user.id},data:{failedLoginAttempts:0,lockedUntil:null}});
-    await setSession(user.id);
-    await audit(user,'LOGIN','session',user.id);
-    return NextResponse.json({ ok: true },{headers:noStore});
-  } catch { return NextResponse.json({ error: 'Login failed' }, { status: 500, headers:{'Cache-Control':'no-store, max-age=0'} }); }
+    await tx.user.update({where:{id:user.id},data:{failedLoginAttempts:attempts,lockedUntil:null}});await log('LOGIN_FAILED',{attempts});return {status:401,error:'Invalid credentials',remaining:5-attempts};
+   }
+   await tx.user.update({where:{id:user.id},data:{failedLoginAttempts:0,lockedUntil:null}});await log('LOGIN',{});return {status:200,userId:user.id,version:user.sessionVersion};
+  });
+  if(result.userId){await setSession(result.userId,result.version);return NextResponse.json({ok:true},{headers});}
+  return NextResponse.json({error:result.error,code:result.code,remaining:result.remaining},{status:result.status,headers:{...headers,...(result.retryAfter?{'Retry-After':String(result.retryAfter)}:{})}});
+ }catch{return NextResponse.json({error:'Login failed'},{status:500,headers});}
 }

@@ -1,3 +1,4 @@
+import { schedulingTransaction } from './scheduling';
 import { prisma } from './prisma';
 
 export function clientIp(request: Request) {
@@ -19,20 +20,22 @@ export async function securityRateLimit(options: {
   const ipAddress = clientIp(options.request);
   const entity = `security:${options.identity.slice(0, 180)}`;
   const scope = options.bindToIp === false ? { action: options.action, entity } : { action: options.action, entity, ipAddress };
-  const attempts = await prisma.auditLog.count({
+  return schedulingTransaction(async tx => {
+  const attempts = await tx.auditLog.count({
     where: { ...scope, createdAt: { gte: since } }
   });
   if (attempts >= options.maximum) {
-    const oldest = await prisma.auditLog.findFirst({
+    const oldest = await tx.auditLog.findFirst({
       where: { ...scope, createdAt: { gte: since } },
       orderBy: { createdAt: 'asc' }, select: { createdAt: true }
     });
     const retryAfter = Math.max(1, Math.ceil(((oldest?.createdAt.getTime() ?? now.getTime()) + options.windowMs - now.getTime()) / 1000));
     return { allowed: false as const, retryAfter };
   }
-  await prisma.auditLog.create({ data: {
+  await tx.auditLog.create({ data: {
     actorName: 'Anonymous', actorRole: 'ANONYMOUS', action: options.action,
     entity, details: null, ipAddress
   }});
   return { allowed: true as const, retryAfter: 0 };
+  });
 }

@@ -8,7 +8,7 @@
     "build": "prisma generate && next build",
     "typecheck": "prisma generate && tsc --noEmit",
     "check": "prisma validate && npm run typecheck",
-    "test:audit": "node scripts/deployment-audit.mjs",
+    "test:audit": "node scripts/test-crm.mjs",
     "start": "next start",
     "db:migrate": "prisma migrate dev",
     "db:deploy": "prisma migrate deploy",
@@ -18,7 +18,9 @@
     "db:pg:validate": "node scripts/postgres.mjs validate",
     "db:pg:deploy": "node scripts/postgres.mjs deploy",
     "db:pg:status": "node scripts/postgres.mjs status",
-    "db:transfer": "node scripts/transfer-postgres.mjs"
+    "db:transfer": "node scripts/transfer-postgres.mjs",
+    "test:crm": "node scripts/run-crm-regression.mjs",
+    "db:backup:postgres": "node scripts/backup-postgres-logical.mjs"
   },
   "dependencies": {
     "@prisma/client": "^6.16.2",
@@ -30,6 +32,7 @@
     "zod": "^4.1.11"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/bcryptjs": "^2.4.6",
     "@types/node": "^22.18.6",
     "@types/react": "^19.1.13",
@@ -43,5 +46,9 @@
     "@prisma/engines@6.19.3": true,
     "esbuild@0.28.2": true,
     "prisma@6.19.3": true
+  },
+  "overrides": {
+    "postcss": "8.5.28",
+    "deepmerge-ts": "8.0.2"
   }
 }
