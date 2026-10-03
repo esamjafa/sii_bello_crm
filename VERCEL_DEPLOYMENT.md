@@ -1,5 +1,19 @@
 # Vercel deployment
 
+## Production — 30 September 2026
+
+Published commit `608bae2` to [sii-bello.vercel.app](https://sii-bello.vercel.app).
+Deployment `dpl_6EQDB8u6P2BxxcdzVqJpxmGy2wUp` is **READY** and aliased to the production domain.
+Deployment URL: https://sii-bello-p87wzs1ui-esamjafas-projects.vercel.app
+
+This release includes the reference-based salon, college, and event screens, the shared plum/fuchsia palette, and the preceding CRM workflow and permissions changes. The latest WhatsApp gateway additions remain removed.
+
+Created a production backup before migration at `backups/postgres-before-crm-1790759050923/snapshot.json`, then successfully applied `20260929100000_document_departments`, `20260929110000_workflow_details`, and `20260929120000_invoice_documents`. All seven migrations are now applied. No seed or reset was run.
+
+Vercel's production build passed; its dependency audit reported zero vulnerabilities. The preceding local regression suite passed 714/714 checks. After deployment, **17/17 live smoke checks passed**: migration status, public pages, login redirect, protected API authentication, existing-account password login, Secure/HttpOnly cookies, workspace rendering, all three department endpoints, and logout. No business records were created or changed by smoke checks; login/logout generate the normal account and audit activity.
+
+[Live verification results](audit-results/production-release-sep30.json). Full business workflow regression was performed locally; the live checks are a smoke test, not a penetration test. Environment files and database backups were excluded from the upload.
+
 ## Production — 26 September 2026
 
 Published the current CRM workspace with Meta-only WhatsApp integration to

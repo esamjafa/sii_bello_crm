@@ -34,8 +34,8 @@ export async function verifyNewWorkflows({db,req,create,check,users,customers,se
  check('Invoice attachment cannot link to another customer',(await req('/api/crm-documents',{role:'ACCOUNTANT',method:'POST',body:mismatched})).status===403);
  const before=await db.invoice.count();check('Excess initial payment rolls back invoice',(await req('/api/crm/invoices',{method:'POST',body:{...invoiceData(mine.id,10),initialPayment:20,idempotencyKey:randomUUID()}})).status===400&&await db.invoice.count()===before);
  const schedule=JSON.stringify(Object.fromEntries(Array.from({length:7},(_,day)=>[day,[{start:'09:00',end:'13:00'},{start:'16:00',end:'20:00'}]])));
- const a=await create('staff',{name:'دوام فترتين',department:'SALON',schedule,active:true});
- const b=await create('staff',{name:'موظفة ثانية',department:'SALON',schedule,active:true});
+ const a=await create('staff',{name:'دوام فترتين',department:'SALON',schedule,active:true,services:[service.id]});
+ const b=await create('staff',{name:'موظفة ثانية',department:'SALON',schedule,active:true,services:[service.id]});
  check('Overlapping staff periods rejected',(await req('/api/crm/staff',{method:'PATCH',body:{id:a.id,schedule:JSON.stringify({0:[{start:'09:00',end:'13:00'},{start:'12:00',end:'15:00'}]})}})).status===400);
  const booking={customerId:customers.ADMIN.id,serviceId:service.id,staffId:a.id,startsAt:'2028-01-02T08:00:00.000Z',status:'CONFIRMED'};
  const appt=await create('appointments',booking);

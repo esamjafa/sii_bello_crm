@@ -23,4 +23,4 @@ The suite covers authentication, role/department/assignment isolation, hidden GO
 - [Event employee screenshot](audit-results/crm-1790749540924/reference-events-EVENT_MANAGER.png)
 - [Mobile salon screenshot](audit-results/crm-1790749540924/salon-390.png)
 
-Screenshots contain isolated test fixtures. The temporary test services were stopped after the run. This change is local and has not been deployed to Vercel. The three migrations from the preceding CRM requirements task still need production deployment; this visual redesign adds no database migration.
+Screenshots contain isolated test fixtures. The temporary test services were stopped after the run. Deployed to [Vercel production](https://sii-bello.vercel.app) on September 30, 2026, after backing up the database and applying the three preceding CRM migrations. The visual redesign adds no database migration. All 17 live smoke checks passed; see [deployment details](VERCEL_DEPLOYMENT.md).

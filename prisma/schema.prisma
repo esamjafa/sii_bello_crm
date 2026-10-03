@@ -69,6 +69,9 @@ model User {
 }
 
 model Customer {
+  preferredServiceId String?
+  servicePreferences Json?
+  consents ConsentRecord[]
   city String?
   country String @default("IL")
   departments String[] @default(["SALON"])
@@ -107,6 +110,11 @@ model Customer {
 }
 
 model Service {
+  onlineBookable Boolean @default(false)
+  imageUrl String?
+  bufferMinutes Int @default(0)
+  resourceKey String?
+  configuration Json?
   department String @default("SALON")
   id String @id @default(cuid())
   name String
@@ -173,6 +181,7 @@ model AuditLog {
   createdAt DateTime @default(now())
   @@index([createdAt])
   @@index([actorId])
+  @@index([action, entity, entityId])
 }
 
 model NotificationLog {
@@ -208,6 +217,12 @@ model Staff {
 }
 
 model Appointment {
+  documents CustomerDocument[]
+  @@index([resourceKey, startsAt])
+  serviceDetails Json?
+  priceSnapshot Json?
+  resourceKey String?
+  bufferMinutes Int @default(0)
   durationMinutes Int?
   price Decimal?
   archivedAt DateTime?
@@ -528,6 +543,8 @@ model CustomerNote {
   updatedAt DateTime @updatedAt
 }
 model CustomerDocument {
+  appointmentId String?
+  appointment Appointment? @relation(fields:[appointmentId], references:[id], onDelete:Restrict)
   invoiceId String?
   invoice Invoice? @relation(fields:[invoiceId], references:[id], onDelete:Restrict)
   department String @default("SALON")
@@ -541,6 +558,18 @@ model CustomerDocument {
   authorId String
   createdAt DateTime @default(now())
   @@index([customerId])
+}
+
+model ConsentRecord {
+  id String @id @default(cuid())
+  customerId String
+  customer Customer @relation(fields:[customerId], references:[id], onDelete:Restrict)
+  purpose String
+  granted Boolean
+  actorId String
+  recordedAt DateTime @default(now())
+  note String
+  @@index([customerId, purpose, recordedAt])
 }
 model Payment {
   id String @id @default(cuid())
@@ -561,6 +590,8 @@ model Payment {
   @@index([invoiceId, paidAt])
 }
 model Product {
+  sku String? @unique
+  onlineVisible Boolean @default(false)
   imageBytes Bytes?
   imageMime String?
   id String @id @default(cuid())

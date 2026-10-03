@@ -1,0 +1,62 @@
+import {randomBytes} from 'node:crypto';
+import {writeFileSync} from 'node:fs';
+import {resolve} from 'node:path';
+import {SignJWT} from 'jose';
+
+export async function verifySecurityProbes({req,check,db,users,customers,cookies,secret,output}){
+ const observations=[];
+ const forged=await new SignJWT({sub:users.ADMIN.id,version:0}).setProtectedHeader({alg:'HS256'}).setExpirationTime('1h').sign(randomBytes(32));
+ const expired=await new SignJWT({sub:users.ADMIN.id,version:0}).setProtectedHeader({alg:'HS256'}).setExpirationTime('1s').setIssuedAt(1).setExpirationTime(2).sign(new TextEncoder().encode(secret));
+ for(const [name,token]of [['forged signature',forged],['expired token',expired],['malformed token','not.a.jwt']])check(`Security: reject ${name}`,(await req('/api/crm/customers',{role:null,cookie:`salon_session=${token}`})).status===401);
+ const parts=cookies.STAFF.split('.');parts[1]=Buffer.from(JSON.stringify({sub:users.ADMIN.id,version:0,exp:Math.floor(Date.now()/1000)+3600})).toString('base64url');
+ check('Security: edited session claims cannot become admin',(await req('/api/crm/users',{role:null,cookie:`salon_session=${parts.join('.')}`})).status===401);
+ check('Security: staff cannot promote own account',(await req('/api/crm/users',{role:'STAFF',method:'PATCH',body:{id:users.STAFF.id,role:'ADMIN'}})).status===403);
+ check('Security: cross-origin financial mutation blocked',(await req('/api/crm/payments',{method:'POST',headers:{Origin:'https://attacker.invalid'},body:{amount:999}})).status===403);
+ const customerBefore=await db.customer.findUnique({where:{id:customers.ADMIN.id}});
+ const attack=await req('/api/crm/customers',{role:'STAFF',method:'PATCH',body:{id:customers.ADMIN.id,name:'unauthorized test'}});
+ check('Security: foreign customer update rejected and unchanged',attack.status>=400&&(await db.customer.findUnique({where:{id:customers.ADMIN.id}})).name===customerBefore.name);
+ const search=await req('/api/crm/customers?q='+encodeURIComponent("' OR 1=1 --"),{role:'STAFF'});
+ check('Security: SQL-like search input treated as data',search.status===200&&search.data.rows.length===0);
+ const invalid=await req('/api/crm/customers',{method:'POST',body:{name:'probe',phone:'972500003877',__securityUnknown:'value'}});
+ check('Security: unexpected properties rejected',invalid.status===400);
+ const huge=await req('/api/crm/customers',{method:'POST',body:JSON.stringify({name:'x'.repeat(70000)})});
+ check('Security: oversized JSON mutation rejected',huge.status===413);
+ const anonymous=await req('/api/crm/users',{role:null,headers:{'x-middleware-subrequest':'middleware:middleware:middleware:middleware:middleware'}});
+ check('Security: middleware bypass header cannot bypass route auth',anonymous.status===401);
+ const headers=(await req('/login',{role:null})).headers;
+ check('Security: browser frame and MIME protections enabled',headers.get('x-frame-options')==='DENY'&&headers.get('x-content-type-options')==='nosniff');
+ const payload=JSON.stringify((await req('/api/crm/customers',{role:'STAFF'})).data);
+ check('Security: staff customer response contains no credential material',!payload.includes('passwordHash')&&!payload.includes('SESSION_SECRET'));
+
+ const known=await req('/api/auth/login',{role:null,method:'POST',body:{username:users.VIEWER.username,password:'wrong-security-probe'},headers:{'x-forwarded-for':'192.0.2.212'}});
+ const unknown=await req('/api/auth/login',{role:null,method:'POST',body:{username:'absent-security-account',password:'wrong-security-probe'},headers:{'x-forwarded-for':'192.0.2.212'}});
+ observations.push({id:'AUTH-ENUM',observed:JSON.stringify(known.data)!==JSON.stringify(unknown.data),description:'Wrong-password responses distinguish an existing account from a missing account.',knownStatus:known.status,unknownStatus:unknown.status,knownKeys:Object.keys(known.data),unknownKeys:Object.keys(unknown.data)});
+ check('Security: wrong password does not disclose whether username exists',known.status===unknown.status&&JSON.stringify(known.data)===JSON.stringify(unknown.data));
+ const rateIp='192.0.2.213';let limited;
+ for(let i=0;i<31;i++)limited=await req('/api/auth/login',{role:null,method:'POST',body:{username:'absent-security-account',password:'wrong-security-probe'},headers:{'x-forwarded-for':rateIp}});
+ check('Security: repeated login attempts reach rate limit',limited.status===429);
+ const rotated=await req('/api/auth/login',{role:null,method:'POST',body:{username:'absent-security-account',password:'wrong-security-probe'},headers:{'x-forwarded-for':'192.0.2.214'}});
+ observations.push({id:'PROXY-IP',observed:limited.status===429&&rotated.status!==429,description:'Direct local access trusts supplied forwarded IP; deployed proxy overwrite must be verified before changing hosting.'});
+ const inventory=await req('/api/crm/products',{role:'INVENTORY'});
+ observations.push({id:'COST-SCOPE',observed:inventory.data.rows?.some(row=>Object.hasOwn(row,'purchasePrice'))??false,description:'Inventory role can read purchase cost under the current policy, contrary to the latest admin-only cost requirement.'});
+ check('Security: inventory response omits purchase cost and margin',inventory.status===200&&inventory.data.rows.length>0&&inventory.data.rows.every(row=>!Object.hasOwn(row,'purchasePrice')&&!Object.hasOwn(row,'margin')));
+ check('Security: inventory cannot retrieve cost valuation',!Object.hasOwn((await req('/api/crm/section-summary?section=inventory',{role:'INVENTORY'})).data,'valuation'));
+ const productId=inventory.data.rows[0].id;
+ check('Security: inventory cannot overwrite hidden purchase cost',(await req('/api/crm/products',{role:'INVENTORY',method:'PATCH',body:{id:productId,purchasePrice:1}})).status===403);
+ check('Security: admin retains product cost access',(await req('/api/crm/products')).data.rows.some(row=>Object.hasOwn(row,'purchasePrice')));
+
+ const logoutUser=await db.user.create({data:{name:'Logout security probe',username:'logout_security_probe',role:'VIEWER',passwordHash:users.VIEWER.passwordHash}});
+ const token=await new SignJWT({sub:logoutUser.id,version:0}).setProtectedHeader({alg:'HS256'}).setExpirationTime('1h').sign(new TextEncoder().encode(secret));
+ const cookie=`salon_session=${token}`;
+ check('Security: isolated logout test session starts valid',(await req('/api/crm/customers',{role:null,cookie})).status===200);
+ await req('/api/auth/logout',{role:null,method:'POST',cookie});
+ const replay=await req('/api/crm/customers',{role:null,cookie});
+ observations.push({id:'LOGOUT-REPLAY',observed:replay.status===200,description:'Copied staff cookie replay after logout.',replayStatus:replay.status});
+ check('Security: copied session cannot replay after logout',replay.status===401);
+ const bookingToken=await new SignJWT({sub:customers.ADMIN.id,scope:'customer_booking'}).setProtectedHeader({alg:'HS256'}).setExpirationTime('1h').sign(new TextEncoder().encode(secret));
+ const bookingCookie=`customer_booking_session=${bookingToken}`;
+ check('Security: isolated customer session starts valid',(await req('/api/booking/data',{role:null,cookie:bookingCookie})).status===200);
+ await req('/api/booking/logout',{role:null,method:'POST',cookie:bookingCookie});
+ check('Security: copied customer cookie cannot replay after logout',(await req('/api/booking/data',{role:null,cookie:bookingCookie})).status===401);
+ writeFileSync(resolve(output,'security-observations.json'),JSON.stringify(observations,null,2));
+}

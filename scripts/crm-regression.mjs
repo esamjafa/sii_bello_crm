@@ -1,3 +1,6 @@
+import {verifyOctoberBrowser} from './crm-october-browser.mjs';
+import {verifySecurityProbes} from './crm-security-probes.mjs';
+import {verifyOctober} from './crm-october-regression.mjs';
 import {verifyReferenceApi,verifyReferenceBrowser} from './crm-reference-regression.mjs';
 import {verifyScheduleEditor} from './crm-browser-schedule.mjs';
 import {verifyBrowserWorkflows} from './crm-browser-workflows.mjs';
@@ -23,6 +26,7 @@ const staff=await db.staff.create({data:{name:'موظفة اختبار',commissi
 for(const role of roles){const u=await db.user.create({data:{name:`اختبار ${role}`,username:`test_${role}`,role,passwordHash:await hash(password,4),...(role==='STAFF'?{staffId:staff.id}:{})}});users[role]=u;cookies[role]=await new SignJWT({sub:u.id,version:0}).setProtectedHeader({alg:'HS256'}).setExpirationTime('1h').sign(new TextEncoder().encode(secret));}
 const customers={};for(const [i,role] of ['STAFF','SALES','ADMIN'].entries())customers[role]=await db.customer.create({data:{name:`عميلة ${role}`,phone:`97250000100${i}`,ownerId:users[role].id}});
 const service=await db.service.create({data:{name:'خدمة اختبار',price:100,durationMinutes:60}});
+await db.staff.update({where:{id:staff.id},data:{services:[service.id]}});
 for(let dayOfWeek=0;dayOfWeek<7;dayOfWeek++)await db.workingHour.create({data:{dayOfWeek,openTime:'09:00',closeTime:'18:00',active:true}});
 const env={...process.env,DATABASE_URL:dburl.toString(),DIRECT_URL:dburl.toString(),SESSION_SECRET:secret,NODE_ENV:'production',WHATSAPP_ACCESS_TOKEN:'',WHATSAPP_PHONE_NUMBER_ID:'',RESEND_API_KEY:'',BOOKING_DEV_OTP:'false',CRON_SECRET:'',FORCE_SECURE_COOKIES:'false'};
 const port=3297,base=`http://localhost:${port}`;
@@ -140,7 +144,7 @@ try{
  check('Laser package session limit',(await req('/api/crm/laserSessions',{method:'POST',body:{planId:plan.id}})).status===409);
  const upload=async(customerId,type,bytes,category='DOCUMENT',role='ADMIN')=>{const f=new FormData();f.set('customerId',customerId);f.set('category',category);f.set('file',new Blob([bytes],{type}),'وثيقة.pdf');return req('/api/crm-documents',{method:'POST',body:f,role});};
  check('Disguised HTML upload rejected',(await upload(main.id,'image/png','<script>alert(1)</script>')).status===400);
- check('Photo consent enforced',(await upload(main.id,'application/pdf','%PDF-1.4 sample','BEFORE')).status===400);
+ check('Session photo requires session and image',(await upload(main.id,'application/pdf','%PDF-1.4 sample','BEFORE')).status===400);
  const doc=await upload(main.id,'application/pdf','%PDF-1.4 sample');check('Valid document upload',doc.status===200,doc.data);
  check('Document IDOR blocked',(await req(`/api/crm-documents?id=${doc.data.id}`,{role:'SALES'})).status===404);
  const downloaded=await req(`/api/crm-documents?id=${doc.data.id}`);check('Unicode download and safe headers',downloaded.status===200&&downloaded.headers.get('content-disposition').includes("filename*=UTF-8''")&&downloaded.headers.get('x-content-type-options')==='nosniff');
@@ -184,7 +188,7 @@ try{
  const hebrew=new FormData();hebrew.set('customerId',main.id);hebrew.set('file',new Blob(['%PDF-1.4 test'],{type:'application/pdf'}),'מסמך.pdf');const hebrewDoc=await req('/api/crm-documents',{method:'POST',body:hebrew});check('Hebrew document download supported',hebrewDoc.status===200&&(await req(`/api/crm-documents?id=${hebrewDoc.data.id}`)).status===200);
  const lockedUser=await db.user.create({data:{name:'قفل اختبار',username:'lock_test',role:'SALES',passwordHash:await hash(password,4)}});
  const failures=await Promise.all(Array.from({length:6},(_,i)=>req('/api/auth/login',{role:null,method:'POST',instance:i%2,body:{username:'lock_test',password:'wrong'}})));
- check('Concurrent login failures lock account exactly once',(await db.user.findUnique({where:{id:lockedUser.id}})).dailyLockCount===1&&failures.filter(x=>x.status===423).length>=2);
+ check('Concurrent login failures lock account exactly once without disclosing existence',(await db.user.findUnique({where:{id:lockedUser.id}})).dailyLockCount===1&&failures.every(x=>x.status===401&&JSON.stringify(x.data)===JSON.stringify({error:'Invalid credentials'})));
  check('Locked account denies correct password',(await req('/api/auth/login',{role:null,method:'POST',body:{username:'lock_test',password}})).status===423);
  check('Cross-site origin cannot be spoofed with forwarded host',(await req('/api/crm/customers',{method:'POST',body:customerData('972500008888'),headers:{Origin:'https://evil.example','X-Forwarded-Host':'evil.example','X-Forwarded-Proto':'https'}})).status===403);
  check('Customer role cannot read operations dashboard',(await req('/api/crm/dashboard',{role:'CUSTOMER'})).status===403);
@@ -230,6 +234,7 @@ try{
  const security=await req('/login');check('Security headers on pages',security.headers.get('x-frame-options')==='DENY'&&security.headers.get('content-security-policy').includes("object-src 'none'"));
  await verifyNewWorkflows({db,req,create,check,users,customers,service,invoiceData});
  await verifyReferenceApi({req,check,db,users,customers,service,create});
+ await verifyOctober({req,check,db,users,customers,create});
  browser=await chromium.launch({headless:true});
  for(const viewport of [{width:1440,height:1000},{width:820,height:1180},{width:390,height:844}]){
    const context=await browser.newContext({viewport});await context.addCookies([{name:'salon_session',value:cookies.ADMIN,domain:'localhost',path:'/',httpOnly:true,sameSite:'Lax'}]);const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
@@ -251,7 +256,7 @@ try{
     await page.getByRole('navigation').getByRole('button',{name:title,exact:false}).click();
     await page.locator('.crm-section-summary').waitFor();await page.waitForTimeout(500);
     check(`Reference screen ${section} no overflow ${viewport.width}`,await page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
-    check(`Reference palette ${section} ${viewport.width}`,await page.locator('.crm-app').evaluate(el=>getComputedStyle(el).backgroundColor)==='rgb(250, 250, 251)');
+    check(`Reference palette ${section} ${viewport.width}`,await page.locator('.crm-app').evaluate(el=>getComputedStyle(el).backgroundColor)==='rgb(248, 246, 250)');
     if(await page.locator('.crm-table td').count())check(`Readable table contrast ${section} ${viewport.width}`,await page.locator('.crm-table td').first().evaluate(el=>{
      const rgb=v=>v.match(/[\d.]+/g).slice(0,3).map(Number);const lum=c=>c.map(v=>{v/=255;return v<=0.04045?v/12.92:((v+0.055)/1.055)**2.4;}).reduce((sum,v,i)=>sum+v*[0.2126,0.7152,0.0722][i],0);
      const foreground=lum(rgb(getComputedStyle(el).color));let parent=el;while(parent&&getComputedStyle(parent).backgroundColor==='rgba(0, 0, 0, 0)')parent=parent.parentElement;
@@ -266,12 +271,14 @@ try{
 
  await page.getByRole('navigation').getByRole('button',{name:'العملاء',exact:false}).click();await page.getByRole('button',{name:'إضافة العملاء'}).click();const modal=page.getByRole('dialog');await modal.getByLabel('الاسم الكامل',{exact:false}).fill('عميلة من المتصفح');await modal.getByLabel('الهاتف الدولي',{exact:false}).fill('972500008881');await modal.getByRole('button',{name:'حفظ',exact:true}).click();await page.getByRole('heading',{name:'عميلة من المتصفح',exact:true}).waitFor();check('Browser customer create flow persists',await db.customer.count({where:{phone:'972500008881'}})===1);
  await page.getByRole('button',{name:'تعديل الملف والمسؤولة'}).click();await page.getByRole('dialog').getByLabel('المدينة',{exact:true}).fill('حيفا');await page.getByRole('dialog').getByRole('button',{name:'حفظ',exact:true}).click();await page.waitForTimeout(500);check('Browser customer edit persists', (await db.customer.findUnique({where:{phone:'972500008881'}})).city==='حيفا');
- const guest=await browser.newContext();const guestPage=await guest.newPage();await guestPage.goto(base+'/book');check('Public booking explains unavailability',await guestPage.getByText('الحجز الإلكتروني غير متاح حاليًا').isVisible());await guest.close();
+ const guest=await browser.newContext();const guestPage=await guest.newPage();await guestPage.goto(base+'/book');check('Public storefront explains checkout is not active',await guestPage.getByText('استعرضي الخدمات والمنتجات؛ إتمام الحجز والدفع الإلكتروني غير مفعّل بعد.').isVisible());await guest.close();
  for(const role of ['STAFF','SALES','TRAINER','EVENT_MANAGER','INVENTORY','ACCOUNTANT']){const ctx=await browser.newContext();await ctx.addCookies([{name:'salon_session',value:cookies[role],domain:'localhost',path:'/'}]);const p=await ctx.newPage();await p.goto(base);await p.getByRole('heading',{name:'نظرة عامة',exact:true}).waitFor();check(`Browser role navigation ${role}`,!(await p.getByRole('navigation').getByRole('button',{name:'الإعدادات والصلاحيات',exact:false}).count()));if(['STAFF','SALES','TRAINER','EVENT_MANAGER','INVENTORY'].includes(role))check(`Browser financial isolation ${role}`,!(await p.getByRole('navigation').getByRole('button',{name:'الدفعات والفواتير',exact:false}).count()));await ctx.close();}
  check('All-section browser runtime errors absent',errors.length===0,errors);await context.close();
  await verifyBrowserWorkflows({browser,base,cookies,db,check,main,output});
  await verifyScheduleEditor({browser,base,cookies,db,check,output});
  await verifyReferenceBrowser({browser,base,cookies,db,check,output});
+ await verifyOctoberBrowser({browser,base,db,check,output,cookies});
+ await verifySecurityProbes({req,check,db,users,customers,cookies,secret,output});
  const failed=results.filter(x=>!x.passed);console.log(JSON.stringify({passed:results.length-failed.length,failed:failed.length,total:results.length}));if(failed.length)process.exitCode=1;
 }catch(e){check('Harness completion',false,e.stack);process.exitCode=1;}
 finally{await browser?.close();for(const server of servers)server.kill();await db.$disconnect();writeFileSync(resolve(output,'results.json'),JSON.stringify({checkedAt:new Date().toISOString(),results},null,2));writeFileSync(resolve(output,'server.log'),logs.replaceAll(secret,'[redacted]').replaceAll(password,'[redacted]'));}

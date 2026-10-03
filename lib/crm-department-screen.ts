@@ -35,6 +35,7 @@ export async function departmentScreen(user:Actor,section:string,eventId=''){
   add('أوراق ناقصة',await prisma.student.count({where:where('students',{archivedAt:null,status:'WAITING_DOCUMENTS'})}),'note','pink','students','WAITING_DOCUMENTS');
   data.courses=allowed(user,'collegeCourses')?(await listRecords(user,'collegeCourses',new URL('http://local/?limit=100'))).rows.filter((c:any)=>c.active&&['UPCOMING','OPEN'].includes(c.status)).sort((a:any,b:any)=>+new Date(a.startsAt??0)-+new Date(b.startsAt??0)).slice(0,4):[];
  }else{
+  data.event=await prisma.event.findFirst({where:where('events',{archivedAt:null,...(eventId?{id:eventId}:{startsAt:{gte:new Date()}})}),select:{id:true,name:true,location:true,startsAt:true,notes:true,currency:true,capacity:true},orderBy:{startsAt:'asc'}});
   const extra={archivedAt:null,...(eventId?{eventId}:{})};
   add('مهتمات جديدات',await prisma.eventLead.count({where:where('eventLeads',{...extra,stage:'NEW'})}),'staff','pink','eventLeads','NEW');
   add('اتصالات اليوم',taskCount,'phone','purple','tasks','TODAY');

@@ -12,8 +12,9 @@ export function actorDepartments(u:Actor):string[] {
  return ['SALON'];
 }
 export function fieldAllowed(u:Actor,r:string,key:string) {
+ if(r==='products'&&key==='purchasePrice'&&!owners(u))return false;
  if(!financial(u)&&['cost','commissionRate','paidAmount','invoiceId'].includes(key))return false;
- if(r==='customers'&&!managers(u)&&!actorDepartments(u).includes('SALON')&&['allergies','careInstructions','photoConsent','serviceConsent','notes','interestedIn'].includes(key))return false;
+ if(r==='customers'&&!managers(u)&&!actorDepartments(u).includes('SALON')&&['preferredServiceId','servicePreferences','allergies','careInstructions','photoConsent','serviceConsent','notes','interestedIn'].includes(key))return false;
  return true;
 }
 const access:Record<string,string[]> = {
@@ -58,7 +59,7 @@ export function scope(u:Actor,r:string):any {
  if(r==='customers')return c;
  if(r==='templates')return managers(u)?{}:{department:{in:actorDepartments(u)}};
  if(r==='tasks')return managers(u)?u.role==='GOD'?{}:{owner:{role:{not:'GOD'}}}:{ownerId:u.id,customer:c};
- if(['notes','documents'].includes(r))return {customer:c,department:{in:actorDepartments(u)}};
+ if(['notes','documents'].includes(r))return {customer:c,department:{in:actorDepartments(u)},...(r==='documents'&&u.role==='STAFF'?{OR:[{appointmentId:null},{appointment:{staffId:u.staffId??'__none__'}}]}:{})};
  if(['hairSessions','invoices'].includes(r))return {customer:c};
  if(r==='appointments')return u.role==='STAFF'?{staffId:u.staffId??'__none__',customer:c}:{customer:c};
  if(r==='laserPlans')return {customer:c};
@@ -76,6 +77,7 @@ export function scope(u:Actor,r:string):any {
 }
 export function sanitize(u:Actor,r:string,row:any):any {
  const out={...row};
+ if(!owners(u)){delete out.purchasePrice;delete out.margin;}
  for(const key of ['passwordHash','sessionVersion','content','imageBytes'])delete out[key];
  if(!financial(u)) {
    for(const key of ['paidAmount','invoiceId'])delete out[key];
@@ -86,7 +88,7 @@ export function sanitize(u:Actor,r:string,row:any):any {
  if(r==='customers'&&!managers(u)) {
    const department=u.role==='COLLEGE'||u.role==='TRAINER'?'COLLEGE':u.role==='EVENT_MANAGER'?'EVENT':['STAFF','RECEPTIONIST','SALES','VIEWER'].includes(u.role)?'SALON':null;
    if(department)out.departments=(out.departments??[]).filter((value:string)=>value===department);
-   if(['COLLEGE','TRAINER','EVENT_MANAGER','ACCOUNTANT','INVENTORY'].includes(u.role))for(const key of ['allergies','careInstructions','photoConsent','serviceConsent','notes','interestedIn'])delete out[key];
+   if(['COLLEGE','TRAINER','EVENT_MANAGER','ACCOUNTANT','INVENTORY'].includes(u.role))for(const key of ['preferredServiceId','servicePreferences','allergies','careInstructions','photoConsent','serviceConsent','notes','interestedIn'])delete out[key];
  }
  if(r==='customers'&&u.role==='INVENTORY')return {id:out.id,name:out.name,phone:out.phone};
  return out;

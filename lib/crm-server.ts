@@ -1,3 +1,4 @@
+import { quoteService, serviceConfiguration } from './service-selection';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { hash } from 'bcryptjs';
@@ -29,7 +30,7 @@ export async function customerOptions(u:Actor,url:URL) {
 export async function bookingOptions(u:Actor,kind:string,url:URL){
  if(!allowed(u,'appointments')&&!financial(u))fail('غير مصرح',403);
  const q=url.searchParams.get('q')?.trim().slice(0,100)??'';
- if(kind==='service-options')return {rows:await prisma.service.findMany({where:{active:true,name:{contains:q,mode:'insensitive'}},select:{id:true,name:true,price:true,durationMinutes:true,department:true},take:100})};
+ if(kind==='service-options')return {rows:await prisma.service.findMany({where:{active:true,...(url.searchParams.get('id')?{id:url.searchParams.get('id')!}:{}),name:{contains:q,mode:'insensitive'}},select:{id:true,name:true,price:true,durationMinutes:true,department:true,configuration:true,imageUrl:true},take:100})};
  if(!allowed(u,'appointments'))fail('غير مصرح',403);
  return {rows:await prisma.staff.findMany({where:{AND:[scope(u,'staff'),{active:true,department:'SALON',name:{contains:q,mode:'insensitive'}}]},select:{id:true,name:true},take:100})};
 }
@@ -44,7 +45,7 @@ export async function appointmentAvailability(u:Actor,url:URL){
  const excludeId=url.searchParams.get('excludeId')??undefined;
  if(excludeId&&!await prisma.appointment.findFirst({where:{AND:[{id:excludeId},scope(u,'appointments')]}}))fail('الموعد غير متاح',404);
  const {start,end}=salonDayRange(new Date(`${day}T12:00:00Z`));const slots:string[]=[];
- await prisma.$transaction(async tx=>{for(let at=+start;at+duration*60000<=+end;at+=30*60000){try{await assertStaffAvailable(tx,staffId,new Date(at),duration);await assertNoOverlap(tx,new Date(at),duration,excludeId,staffId);slots.push(new Date(at).toISOString());}catch(e){if(!(e instanceof SchedulingConflict))throw e;}}},{timeout:15000});
+ await prisma.$transaction(async tx=>{for(let at=+start;at+duration*60000<=+end;at+=30*60000){try{await assertStaffAvailable(tx,staffId,new Date(at),duration,service.id);await assertNoOverlap(tx,new Date(at),duration,excludeId,staffId,service);slots.push(new Date(at).toISOString());}catch(e){if(!(e instanceof SchedulingConflict))throw e;}}},{timeout:15000});
  return {slots};
 }
 export async function recordAudit(tx:any,u:Actor,action:string,r:string,id:string,before?:any,after?:any) {
@@ -55,9 +56,11 @@ function schemaFor(r:string,partial=false) {
  const shape:Record<string,z.ZodType>={};
  for(const f of crm[r].fields) {
    let v:z.ZodType;
-   if(f.type==='number')v=z.coerce.number().finite().min(f.key==='quantity'?-1000000:0).max(100000000);
+   if(f.type==='serviceConfiguration')v=serviceConfiguration;
+   else if(f.type==='serviceDetails')v=z.record(z.string(),z.unknown());
+   else if(f.type==='number')v=z.coerce.number().finite().min(f.key==='quantity'?-1000000:0).max(100000000);
    else if(f.type==='checkbox')v=z.boolean();
-   else if(['multi','tags'].includes(f.type))v=f.options?z.array(z.enum(f.options as [string,...string[]])).min(1).max(4):z.array(z.string().max(100)).max(40);
+   else if(['multi','tags','serviceSkills'].includes(f.type))v=f.options?z.array(z.enum(f.options as [string,...string[]])).min(1).max(4):z.array(z.string().max(100)).max(40);
    else if(f.type==='date')v=z.union([z.string().datetime(),z.literal(''),z.null()]).transform(x=>x?new Date(x):null);
    else if(f.type==='select')v=z.enum([...f.options!,...(partial&&r==='students'&&f.key==='status'?['NEW','CONTACTED','AWAITING_DETAILS','ENROLLED','INACTIVE']:[]),...(partial&&r==='eventLeads'&&f.key==='stage'?['CLOSED']:[])] as [string,...string[]]);
    else if(f.type==='email')v=z.union([z.email(),z.literal(''),z.null()]);
@@ -74,6 +77,11 @@ export async function listRecords(u:Actor,r:string,url:URL) {
  const page=Math.max(1,Math.min(100000,Number(url.searchParams.get('page'))||1));
  const take=Math.min(100,Math.max(1,Number(url.searchParams.get('limit'))||30));
  const where:any={AND:[scope(u,r)]};
+ if(r==='appointments'){
+  for(const key of ['staffId','serviceId'])if(url.searchParams.get(key))where.AND.push({[key]:url.searchParams.get(key)});
+  const day=url.searchParams.get('day');
+  if(day){if(!/^\d{4}-\d{2}-\d{2}$/.test(day)||!Number.isFinite(+new Date(day))||new Date(day).toISOString().slice(0,10)!==day)fail('اختاري تاريخًا صحيحًا');const {start,end}=salonDayRange(new Date(`${day}T12:00:00Z`),url.searchParams.get('period')==='WEEK'?7:1);where.AND.push({startsAt:{gte:start,lt:end}});}
+ }
  if(archived.has(r))where.AND.push({archivedAt:url.searchParams.get('archived')==='true'?{not:null}:null});
  const customerId=url.searchParams.get('customerId');
  if(customerId)where.AND.push(r==='customers'?{id:customerId}:r==='payments'?{invoice:{customerId}}:r==='laserSessions'?{plan:{customerId}}:r==='enrollments'?{student:{customerId}}:r==='attendance'?{enrollment:{student:{customerId}}}:{customerId});
@@ -186,8 +194,8 @@ export async function mutateRecord(u:Actor,r:string,body:any,method:string){
    }
    if(operation==='restore'&&r==='appointments'&&['SCHEDULED','CONFIRMED','PENDING_REPLY','COMPLETED'].includes(previous.status)){
     const service=await db.service.findUniqueOrThrow({where:{id:previous.serviceId}});const duration=previous.durationMinutes??service.durationMinutes;
-    await assertNoOverlap(tx,previous.startsAt,duration,previous.id,previous.staffId);
-    if(previous.staffId)await assertStaffAvailable(tx,previous.staffId,previous.startsAt,duration);
+    await assertNoOverlap(tx,previous.startsAt,duration,previous.id,previous.staffId,previous);
+    if(previous.staffId)await assertStaffAvailable(tx,previous.staffId,previous.startsAt,duration,service.id);
    }
    if(operation==='restore'&&r==='enrollments'){const course=await db.collegeCourse.findUniqueOrThrow({where:{id:previous.courseId}});if(await db.studentEnrollment.count({where:{courseId:course.id,archivedAt:null,status:{not:'WITHDRAWN'}}})>=course.capacity)fail('المجموعة مكتملة',409);}
    if(operation==='void'&&r==='payments'){
@@ -217,6 +225,10 @@ export async function mutateRecord(u:Actor,r:string,body:any,method:string){
   if(updating&&['students','notes','tasks','laserPlans','hairSessions'].includes(r)&&data.customerId&&data.customerId!==previous.customerId)fail('لا يمكن نقل السجل التاريخي إلى عميلة أخرى');
   for(const key of ['amount','fee','price','originalAmount','originalPrice','discount','quotedPrice','offeredDiscount','purchasePrice','salePrice','cost','depositRequired','commissionRate'])if(data[key]!==undefined&&decimal(data[key]).decimalPlaces()>2)fail('المبالغ تقبل منزلتين عشريتين فقط');
   if(r==='customers'){
+    if(combined.preferredServiceId&&(data.servicePreferences!==undefined||data.preferredServiceId!==undefined)){
+      const service=await db.service.findFirst({where:{id:combined.preferredServiceId,active:true}});if(!service)fail('الخدمة غير متاحة');
+      try{const quote=quoteService(service,data.servicePreferences??{});data.servicePreferences=quote.details;data.interestedIn=service.name;}catch(e:any){fail(e.message);}
+    }else if(data.servicePreferences&&Object.keys(data.servicePreferences).length)fail('اختاري الخدمة قبل إدخال تفاصيلها');
     if(data.phone)data.phone=normalizePhone(data.phone);
     if(!managers(u)){
       if(data.ownerId&&data.ownerId!==u.id&&data.ownerId!==previous?.ownerId)fail('لا يمكنك إسناد العميلة لموظفة أخرى',403);
@@ -331,6 +343,7 @@ export async function mutateRecord(u:Actor,r:string,body:any,method:string){
     if(data.receiptDocumentId){const doc=await db.customerDocument.findUniqueOrThrow({where:{id:data.receiptDocumentId}});if(doc.customerId!==inv.customerId)fail('الإيصال لا يتبع العميلة');}
     data.idempotencyKey=key;data.receivedById=u.id;
   }
+  if(r==='products'&&data.sku==='')data.sku=null;
   if(r==='products'&&data.imageUrl&&!/^\/(?!\/)[\w/.-]+$/.test(data.imageUrl))fail('استخدمي مسار صورة محلي آمن');
   if(r==='stockMovements'){
     if(!key)fail('معرّف الحركة مطلوب');
@@ -353,6 +366,11 @@ export async function mutateRecord(u:Actor,r:string,body:any,method:string){
     data.actorId=u.id;data.idempotencyKey=key;
   }
   if(r==='expenses')data.status=combined.paidAt?'PAID':'DUE';
+  if(r==='services'){
+    if(!Number.isInteger(combined.bufferMinutes??0)||(combined.bufferMinutes??0)>240)fail('الفاصل من 0 إلى 240 دقيقة');
+    if(combined.imageUrl&&!/^\/(?!\/)[^\s]*$/.test(combined.imageUrl)&&!/^https:\/\//.test(combined.imageUrl))fail('رابط الصورة يجب أن يبدأ بـ https أو يكون محليًا');
+    if(combined.department!=='LASER'&&(combined.configuration?.areas?.length||combined.configuration?.offers?.length))fail('المناطق والعروض لخدمة الليزر فقط');
+  }
   if(r==='workingHours'&&(!Number.isInteger(combined.dayOfWeek)||combined.dayOfWeek<0||combined.dayOfWeek>6||!/^([01]\d|2[0-3]):[0-5]\d$/.test(combined.openTime)||!/^([01]\d|2[0-3]):[0-5]\d$/.test(combined.closeTime)||combined.active&&combined.openTime>=combined.closeTime))fail('ساعات العمل غير صالحة');
   if(r==='laserPlans'&&(!Number.isInteger(combined.sessionsTotal)||combined.sessionsTotal<1))fail('عدد الجلسات موجب وصحيح');
   if(r==='laserPlans'&&updating&&await db.laserSession.count({where:{planId:body.id,archivedAt:null}})>combined.sessionsTotal)fail('عدد الجلسات أقل من المنفّذ');
@@ -363,13 +381,18 @@ export async function mutateRecord(u:Actor,r:string,body:any,method:string){
     if(!service.active&&!updating)fail('الخدمة غير فعالة');
     const changedService=!updating||data.serviceId&&data.serviceId!==previous.serviceId;
     const duration=data.durationMinutes??(changedService?service.durationMinutes:previous.durationMinutes??service.durationMinutes);
-    const price=data.price??(changedService?service.price:previous.price??service.price);
-    if(!managers(u)&&(Number(duration)!==Number(changedService?service.durationMinutes:previous.durationMinutes??service.durationMinutes)||!decimal(price).eq(changedService?service.price:previous.price??service.price)))fail('تعديل سعر الخدمة أو مدتها للإدارة',403);
+    const selectionChanged=changedService||(data.serviceDetails!==undefined&&JSON.stringify(data.serviceDetails)!==JSON.stringify(previous?.serviceDetails??{}));
+    let quote;
+    if(selectionChanged&&(service.department!=='LASER'||service.configuration||data.serviceDetails?.areaIds?.length)){try{quote=quoteService(service,data.serviceDetails??{});}catch(e:any){fail(e.message);}}
+    if(quote){data.serviceDetails=quote.details;data.priceSnapshot=quote;}
+    if(changedService){data.resourceKey=service.resourceKey;data.bufferMinutes=service.bufferMinutes;}
+    const price=quote&&service.department==='LASER'?quote.finalPrice:data.price??(changedService?service.price:previous.price??service.price);
+    if(!managers(u)&&(Number(duration)!==Number(changedService?service.durationMinutes:previous.durationMinutes??service.durationMinutes)||!decimal(price).eq(quote&&service.department==='LASER'?quote.finalPrice:changedService?service.price:previous.price??service.price)))fail('تعديل سعر الخدمة أو مدتها للإدارة',403);
     if(!Number.isInteger(duration)||duration<1||duration>1440)fail('مدة الخدمة من 1 إلى 1440 دقيقة');
-    data.durationMinutes=duration;data.price=price;
+    data.durationMinutes=duration;data.price=price;if(data.priceSnapshot)data.priceSnapshot.finalPrice=Number(price);
     if(['SCHEDULED','CONFIRMED','PENDING_REPLY','COMPLETED'].includes(combined.status??'SCHEDULED')){
-      await assertNoOverlap(tx,new Date(combined.startsAt),duration,previous?.id,combined.staffId);
-      if(combined.staffId)await assertStaffAvailable(tx,combined.staffId,new Date(combined.startsAt),duration);
+      await assertNoOverlap(tx,new Date(combined.startsAt),duration,previous?.id,combined.staffId,changedService?service:previous);
+      if(combined.staffId)await assertStaffAvailable(tx,combined.staffId,new Date(combined.startsAt),duration,service.id);
     }
     if(combined.status==='COMPLETED'&&(!combined.sessionNotes?.trim()||(financial(u)&&!combined.invoiceId)))fail('لإنهاء الخدمة سجلي ملاحظات الجلسة وفاتورتها');
     if(combined.invoiceId){const inv=await db.invoice.findUniqueOrThrow({where:{id:combined.invoiceId}});if(inv.customerId!==combined.customerId)fail('الفاتورة لا تتبع العميلة');}
@@ -406,6 +429,7 @@ export async function dashboard(u:Actor){
  if(u.role==='CUSTOMER')fail('غير مصرح',403);
  const now=new Date();const {start:today,end}=salonDayRange(now);
  const result:any={};
+ if(allowed(u,'tasks'))result.todayTasks=await prisma.task.count({where:{AND:[scope(u,'tasks'),{dueAt:{gte:today,lt:end},completedAt:null,archivedAt:null}]}});
  if(allowed(u,'students'))result.waitingStudents=(await listRecords(u,'students',new URL('http://local/?status=WAITING_DOCUMENTS&limit=12'))).rows;
  if(allowed(u,'eventLeads'))result.waitingEvents=(await listRecords(u,'eventLeads',new URL('http://local/?status=WAITING_REPLY&limit=12'))).rows;
  if(allowed(u,'tasks')){result.overdue=await prisma.task.count({where:{AND:[scope(u,'tasks'),{dueAt:{lt:now},completedAt:null,archivedAt:null}]}});result.tasks=await prisma.task.findMany({where:{AND:[scope(u,'tasks'),{completedAt:null,archivedAt:null,dueAt:{lte:end}}]},orderBy:{dueAt:'asc'},take:12});}

@@ -1,0 +1,41 @@
+/* October 2 approved identity. Legacy colors remain an explicit user preference. */
+.crm-app:not([data-theme=legacy]){--ink:#282033;--muted:#6f657a;--line:#e6dfed;--green:#775197;--accent:#775197;--surface:#ffffffeb;--raised:#f4eef8;background:radial-gradient(ellipse at 15% 0%,#e8dff5 0,transparent 48%),radial-gradient(ellipse at 95% 85%,#f3e8ee 0,transparent 45%),#f8f6fa;color:var(--ink)}
+.crm-app:not([data-theme=legacy]) .crm-sidebar{background:#faf7fce8;border-inline-end:1px solid #e7dfec;box-shadow:0 8px 30px #61417408}
+.crm-app:not([data-theme=legacy]) .crm-sidebar :is(.crm-brand,.crm-account,.crm-account small){color:#3f3050}
+.crm-app:not([data-theme=legacy]) .crm-brand{color:#3f3050!important}
+.crm-app:not([data-theme=legacy]) :is(.crm-brand span,.crm-account button){color:#685476}
+.crm-app .crm-theme-label{display:inline;font-size:12px;line-height:1.4}
+.crm-app .crm-theme-toggle{font-size:12px;min-height:44px;white-space:normal}
+.crm-app:not([data-theme=legacy]) .crm-page-heading h1 .crm-icon{color:#775197}
+.crm-app:not([data-theme=legacy]) .crm-sidebar nav button{color:#594565}
+.crm-app:not([data-theme=legacy]) .crm-sidebar nav button:is(.active,:hover){color:#4b2f65;background:linear-gradient(100deg,#eee2f7,#f7f2fa)!important;border-inline-end-color:#9270ac}
+.crm-app:not([data-theme=legacy]) :is(.crm-primary,.storefront .primary){background:#775197;border-color:#775197;color:white;box-shadow:inset 0 1px 0 #ffffff30,0 3px 9px #63437814}
+.crm-app:not([data-theme=legacy]) .crm-primary:hover{background:#65427f}
+.crm-app:not([data-theme=legacy]) :is(.crm-panel,.oct-kpis>button,.service-card){background:#fffffff0!important;border:1px solid #e9e2ef!important;box-shadow:0 5px 22px #63457808;border-radius:18px}
+.crm-app:not([data-theme=legacy]) .oct-kpis .crm-icon{background:linear-gradient(145deg,#f1e8f9,#e3d4ef);color:#7c559f;border-radius:17px;box-shadow:inset 0 2px 2px white,0 3px 5px #84659714}
+.crm-app:not([data-theme=legacy]) .crm-table th{background:#f5f1f8;color:#655470}
+.crm-app:not([data-theme=legacy]) :is(.crm-tabs button.active,.service-category-tabs button.active){background:#ede2f6;border-color:#a584be;color:#5e397d}
+.crm-app:not([data-theme=legacy]) :is(.crm-profile-head,.crm-page-heading h1 .crm-icon){background:#f1eaf7}
+.crm-app:not([data-theme=legacy]) .oct-event-flow button:nth-child(2){background:#f1eaf7;color:#65427f}
+.crm-app:not([data-theme=legacy]) .laser-area:has(input:checked){background:#f1e9f8;border-color:#b89bce}
+.crm-app:not([data-theme=legacy]) .laser-area input{accent-color:#775197}
+.crm-app:not([data-theme=legacy]) .laser-area strong{color:#64427f}
+.service-total{position:static;background:#f5eef9;border-color:#dacee4}
+.service-card small{grid-column:2;color:#766b7c;font-weight:400;font-size:13px}
+.service-detail-panel{position:fixed;inset:0 auto 0 0;margin:0;width:min(570px,95vw);height:100dvh;max-height:100dvh;max-width:100vw;border:1px solid #e5dbea;background:#faf8fc;color:#282033;padding:0;box-shadow:10px 0 50px #34223f1c;font-family:Tahoma,Arial,sans-serif;direction:rtl}
+.service-detail-panel::backdrop{background:#23162d55}
+.service-detail-panel.is-expanded{width:100vw}
+.service-detail-panel header,.service-detail-panel footer{display:flex;justify-content:space-between;align-items:center;gap:14px;padding:20px;background:white;position:sticky;z-index:1}
+.service-detail-panel header{top:0;border-bottom:1px solid #e7deee;flex-wrap:wrap}.service-detail-panel footer{bottom:0;border-top:1px solid #e7deee;flex-wrap:wrap}
+.service-detail-panel h2{font-size:24px;margin:10px 0}.service-detail-panel small{color:#74647d}.service-detail-panel button{min-height:44px;border:1px solid #ded1e8;border-radius:10px;padding:10px 15px;font:inherit;background:#f5eff9;color:#583975;cursor:pointer}.service-detail-panel button.crm-primary{background:#775197;color:white}
+.service-detail-controls{display:flex;gap:8px}.service-detail-content{padding:24px;min-height:calc(100dvh - 235px)}.service-detail-image{width:120px;height:120px;object-fit:cover;border-radius:15px}.service-detail-facts{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}.service-detail-facts div{padding:15px;background:white;border-radius:12px}.service-detail-facts dt{color:#75687e;font-size:13px}.service-detail-facts dd{margin:10px 0 0;font-weight:bold}.service-detail-panel details{border-block-end:1px solid #e3d9eb;padding-block:18px}.service-detail-panel summary{cursor:pointer;min-height:32px;font-weight:bold}.service-detail-panel ul{list-style:none;padding:0}.service-detail-panel li{display:flex;justify-content:space-between;gap:15px;padding:12px 0}.service-detail-panel li small{display:block;margin-top:8px}.service-detail-hint{font-size:14px;color:#776b7e;line-height:1.8;margin-top:30px}
+.crm-app[data-background=calm]{background:#f8f7fa}.crm-app[data-background=calm] .crm-panel{box-shadow:none}
+.storefront{background:linear-gradient(145deg,#f9f6fc,#fff);color:#30233e;border-radius:20px}
+.storefront :is(.primary,.store-slots button[aria-pressed=true]){background:#775197;border-color:#775197;color:white}
+.storefront .service-category-tabs button.active{background:#eee4f6;border-color:#a589bb;color:#5c3978}
+.storefront .laser-area:has(input:checked){background:#f1e9f8;border-color:#b89bce}
+.storefront .laser-area strong{color:#64427f}.storefront .laser-area input{accent-color:#775197}
+.storefront header h1{color:#604475}
+@media(max-width:760px){.crm-topbar{height:auto;min-height:68px;flex-wrap:wrap;padding-block:10px}.crm-search{flex-basis:calc(100% - 55px)}.crm-app .crm-theme-toggle{padding:8px!important}}
+@media(max-width:650px){.service-detail-panel{width:100vw}.service-detail-content{padding:16px}.service-detail-facts{gap:6px}.service-detail-facts div{padding:10px}.service-detail-panel footer button{flex:1}.service-detail-panel header{padding:16px}}
+@media(prefers-reduced-motion:reduce){.crm-app *{scroll-behavior:auto!important;transition:none!important}}

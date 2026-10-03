@@ -1,0 +1,9 @@
+'use client';
+import {useEffect,useState} from 'react';
+export default function AppointmentFilters({value,onChange}:{value:Record<string,string>;onChange:(v:Record<string,string>)=>void}){
+ const [staff,setStaff]=useState<any[]>([]),[services,setServices]=useState<any[]>([]),[error,setError]=useState('');
+ useEffect(()=>{Promise.all(['/api/crm/staff-options','/api/crm/service-options'].map(p=>fetch(p).then(r=>r.json()))).then(([a,b])=>{if(a.error||b.error)throw Error(a.error||b.error);setStaff(a.rows);setServices(b.rows);}).catch(e=>setError(e.message));},[]);
+ const today=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jerusalem'}).format(new Date());
+ const change=(v:Record<string,string>)=>onChange({...value,...v});
+ return <section className="crm-panel oct-appointment-filters"><div className="crm-inline"><label>تاريخ المواعيد<input type="date" value={value.day??''} onChange={e=>change({day:e.target.value,period:value.period??'DAY'})}/></label><div className="crm-tabs">{[['DAY','اليوم'],['WEEK','الأسبوع'],['ALL','قائمة']].map(([v,l])=><button key={v} type="button" className={(value.period??'ALL')===v?'active':''} onClick={()=>change({period:v,day:v==='ALL'?'':value.day||today})}>{l}</button>)}</div></div><div className="crm-form-grid"><label>الموظفة<select aria-label="تصفية المواعيد بالموظفة" value={value.staffId??''} onChange={e=>change({staffId:e.target.value})}><option value="">كل الموظفات المخولات</option>{staff.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label><label>الخدمة<select aria-label="تصفية المواعيد بالخدمة" value={value.serviceId??''} onChange={e=>change({serviceId:e.target.value})}><option value="">كل الخدمات</option>{services.map(s=><option key={s.id} value={s.id}>{s.name}</option>)}</select></label></div>{error&&<p role="alert">{error}</p>}</section>;
+}

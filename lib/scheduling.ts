@@ -36,9 +36,10 @@ export async function schedulingTransaction<T>(operation: (tx: Prisma.Transactio
   }
 }
 
-export async function assertStaffAvailable(tx:Prisma.TransactionClient,staffId:string,startsAt:Date,durationMinutes:number){
+export async function assertStaffAvailable(tx:Prisma.TransactionClient,staffId:string,startsAt:Date,durationMinutes:number,serviceId?:string){
  const staff=await tx.staff.findUnique({where:{id:staffId}});
  if(!staff?.active)throw new SchedulingConflict('الموظفة غير متاحة');
+ if(serviceId&&!staff.services.includes(serviceId))throw new SchedulingConflict('الموظفة غير مؤهلة للخدمة؛ حددي الخدمات التي تقدمها في ملفها');
  let schedule;try{schedule=parseSchedule(staff.schedule);}catch{throw new SchedulingConflict('يجب تحديث جدول الموظفة قبل الحجز');}
  if(!schedule){
   const localDate=new Intl.DateTimeFormat('en-CA',{timeZone:'Asia/Jerusalem',year:'numeric',month:'2-digit',day:'2-digit'}).format(startsAt);
@@ -51,13 +52,13 @@ export async function assertStaffAvailable(tx:Prisma.TransactionClient,staffId:s
  if(await tx.employeeLeave.findFirst({where:{staffId,status:'APPROVED',startsAt:{lt:endsAt},endsAt:{gt:startsAt}}}))throw new SchedulingConflict('الموظفة في إجازة أثناء الموعد');
 }
 // An unassigned booking reserves salon capacity; assigned bookings reserve their staff member.
-export async function assertNoOverlap(tx: Prisma.TransactionClient, startsAt: Date, durationMinutes: number, excludeId?: string,staffId?:string|null) {
-  const end = startsAt.getTime() + durationMinutes * 60000;
+export async function assertNoOverlap(tx: Prisma.TransactionClient, startsAt: Date, durationMinutes: number, excludeId?: string,staffId?:string|null,service?:{resourceKey?:string|null;bufferMinutes?:number}) {
+  const end = startsAt.getTime() + (durationMinutes+(service?.bufferMinutes??0)) * 60000;
   const appointments = await tx.appointment.findMany({
-    where: { ...(excludeId ? { id: { not: excludeId } } : {}),...(staffId?{OR:[{staffId},{staffId:null}]}:{}),archivedAt:null, startsAt: { lt: new Date(end) }, status: { in: ['SCHEDULED','PENDING_REPLY','CONFIRMED', 'COMPLETED'] } },
+    where: { ...(excludeId ? { id: { not: excludeId } } : {}),...(staffId?{OR:[{staffId},{staffId:null},...(service?.resourceKey?[{resourceKey:service.resourceKey},{service:{resourceKey:service.resourceKey}}]:[])]}:{}),archivedAt:null, startsAt: { lt: new Date(end) }, status: { in: ['SCHEDULED','PENDING_REPLY','CONFIRMED', 'COMPLETED'] } },
     include: { service: true }
   });
-  if (appointments.some(a => startsAt.getTime() < a.startsAt.getTime() + (a.durationMinutes??a.service.durationMinutes) * 60000)) {
+  if (appointments.some(a => startsAt.getTime() < a.startsAt.getTime() + ((a.durationMinutes??a.service.durationMinutes)+(a.bufferMinutes||a.service.bufferMinutes)) * 60000)) {
     throw new SchedulingConflict('الموعد يتداخل مع حجز قائم؛ اختاري وقتًا آخر');
   }
 }

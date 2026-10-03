@@ -1,5 +1,5 @@
 import { prisma } from './prisma';
-import { allowed, financial, scope, type Actor } from './crm-access';
+import { allowed, financial, owners, scope, type Actor } from './crm-access';
 import { CrmError, listRecords } from './crm-server';
 import { salonDayRange, salonMonthStart } from './business-time';
 
@@ -44,7 +44,7 @@ export async function sectionSummary(user:Actor, section:string, eventId:string)
   const quantity=(id:string)=>stock.find(s=>s.productId===id)?._sum.quantity??0;
   add('مخزون منخفض',products.filter(p=>quantity(p.id)<=p.minimum).length,'products','LOW');
   add('قطع سُلّمت للطالبات هذا الشهر',Math.abs((await prisma.stockMovement.aggregate({where:{kind:'KIT',createdAt:{gte:salonMonthStart(now)}},_sum:{quantity:true}}))._sum.quantity??0),'stockMovements');
-  if(financial(user)||user.role==='INVENTORY')result.valuation=Object.entries(products.reduce((acc:Record<string,number>,p)=>{acc[p.currency]=(acc[p.currency]??0)+quantity(p.id)*Number(p.purchasePrice);return acc;},{})).map(([currency,amount])=>({currency,amount}));
+  if(owners(user))result.valuation=Object.entries(products.reduce((acc:Record<string,number>,p)=>{acc[p.currency]=(acc[p.currency]??0)+quantity(p.id)*Number(p.purchasePrice);return acc;},{})).map(([currency,amount])=>({currency,amount}));
  }
  if(section==='staff'){
   const staff=await prisma.staff.findMany({where:scope(user,'staff'),select:{id:true,name:true,title:true}});

@@ -56,7 +56,7 @@ export async function PATCH(request:Request) {
     let appointmentId:string|undefined;
     let invoiceId:string|undefined;
     if(parsed.data.decision==='APPROVED') {
-      await assertNoOverlap(tx,existing.preferredAt,existing.service.durationMinutes);
+      await assertNoOverlap(tx,existing.preferredAt,existing.service.durationMinutes,undefined,undefined,existing.service);
       const appointment=await tx.appointment.create({data:{customerId:existing.customerId,serviceId:existing.serviceId,startsAt:existing.preferredAt,status:'SCHEDULED',notes:existing.notes}});
       appointmentId=appointment.id;
       const invoice=await tx.invoice.create({data:{customerId:existing.customerId,serviceId:existing.serviceId,description:`Appointment: ${existing.service.name}`,originalAmount:existing.service.price,amount:existing.service.price,paidAmount:0,status:'UNPAID',dueAt:existing.preferredAt}});
