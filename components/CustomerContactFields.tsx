@@ -6,7 +6,7 @@ export function CustomerPhone({value,onChange}:{value:string;onChange:(v:string)
  const digits=(value??'').replace(/\D/g,'').replace(/^00/,'');
  const initial=digits.startsWith('0')?'972':callingCodes.find(c=>digits.startsWith(c))??'972';
  const [code,setCode]=useState('+'+initial),[number,setNumber]=useState(digits.startsWith('0')?digits:digits.slice(initial.length));
- const update=(c:string,n:string)=>{setCode(c);setNumber(n);onChange(n?`${c}${n.replace(/\D/g,'').replace(c==='+39'?/^$/:/^0/,'')}`:'');};
- return <div className="customer-phone-fields" dir="ltr"><label>رمز الدولة<input aria-label="رمز الدولة" type="tel" inputMode="tel" required pattern="\+[1-9][0-9]{0,2}" value={code} onChange={e=>update(e.target.value,number)} placeholder="+972"/></label><label>رقم الهاتف<input aria-label="رقم الهاتف" type="tel" inputMode="tel" autoComplete="tel-national" required pattern="[0-9 ]{5,20}" value={number} onChange={e=>update(code,e.target.value)} placeholder="0501234567"/></label></div>;
+ const update=(c:string,n:string)=>{const national=n.replace(/[\u0660-\u0669]/g,ch=>String(ch.charCodeAt(0)-0x660)).replace(/[\u06f0-\u06f9]/g,ch=>String(ch.charCodeAt(0)-0x6f0)).replace(/\D/g,'').slice(0,10);setCode(c);setNumber(national);onChange(national?`${c}${national.replace(c==='+39'?/^$/:/^0/,'')}`:'');};
+ return <div className="customer-phone-fields" dir="ltr"><label>رمز الدولة<input aria-label="رمز الدولة" type="tel" inputMode="tel" required pattern="\+[1-9][0-9]{0,2}" value={code} onChange={e=>update(e.target.value,number)} placeholder="+972"/></label><label>رقم الهاتف<input aria-label="رقم الهاتف" type="tel" inputMode="numeric" autoComplete="tel-national" required maxLength={10} pattern="[0-9]{5,10}" title="رقم الهاتف من 5 إلى 10 أرقام دون رمز الدولة" value={number} onChange={e=>update(code,e.target.value)} placeholder="0501234567"/></label></div>;
 }
 export {CustomerServices} from './CustomerCatalogue';
