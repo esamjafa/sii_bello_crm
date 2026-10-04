@@ -20,7 +20,8 @@ const channel = () => sel('channel','وسيلة التواصل',['WHATSAPP','PHO
 const def = (title:string,model:string,section:string,fields:CrmField[],columns:string[],immutable=false):CrmDefinition => ({title,model,section,fields,columns,immutable});
 export const crm: Record<string,CrmDefinition> = {
  customers:def('العملاء','customer','customers',[
-   f('name','الاسم الكامل','text',true),f('phone','الهاتف الدولي','tel',true),rel('preferredServiceId','الخدمة المطلوبة','services'),f('servicePreferences','تفاصيل الخدمة المختارة','serviceDetails'),f('departments','الأقسام','multi',true,{options:departments,initial:['SALON']}),
+   f('name','الاسم الكامل','text',true),f('phone','الهاتف الدولي','tel',true),f('gender','الجنس','select',false,{options:['FEMALE','MALE']}),rel('preferredServiceId','الخدمة المطلوبة','services'),f('servicePreferences','تفاصيل الخدمة المختارة','serviceDetails'),f('departments','الأقسام','multi',true,{options:departments,initial:['SALON']}),
+   f('catalogueInterests','كتالوج الخدمات','serviceDetails'),
    sel('source','مصدر العميل',['OTHER','AD','INSTAGRAM','REFERRAL','WHATSAPP','WALK_IN']),sel('relationshipStatus','الحالة',['NEW','INTERESTED','ACTIVE','FOLLOW_UP','INACTIVE','RETURNING']),rel('ownerId','الموظفة المسؤولة','team'),
    f('city','المدينة'),f('country','الدولة','text',false,{initial:'IL'}),f('email','البريد الإلكتروني','email'),f('interestedIn','الخدمة المطلوبة'),d('followUpAt','المتابعة القادمة'),memo('allergies','حساسية أو موانع'),memo('careInstructions','تعليمات العناية'),check('photoConsent','الموافقة على التصوير'),check('serviceConsent','الموافقة على الشروط'),memo('notes','ملاحظات')
  ],['name','phone','departments','relationshipStatus','ownerId','followUpAt']),
@@ -70,3 +71,5 @@ labels.LEADS='المهتمات';labels.REGISTRATIONS='المسجلات فعلي�
 labels.margin='هامش الربح';
 labels.ENROLLED='مسجلة';
 labels.AWAITING_DETAILS='بانتظار التفاصيل';
+
+labels.FEMALE='أنثى';labels.MALE='ذكر';

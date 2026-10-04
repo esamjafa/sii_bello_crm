@@ -1,0 +1,45 @@
+.crm-dialog:has(.laser-registration){width:min(1280px,97vw);max-width:97vw}
+.crm-form-grid>div:has(.laser-registration),.crm-form-grid>div:has(.laser-selection-summary){grid-column:1/-1}
+.laser-registration{color:#32223f;background:linear-gradient(130deg,#f6f2fc,#fdfbfd 50%,#eee5f7);padding:18px;border-radius:22px;border:1px solid white}
+.laser-registration-heading,.laser-registration-footer{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.laser-registration-heading h2{margin:0;font-size:25px}.laser-registration-heading p{margin:8px 0;color:#6f607c}
+.laser-registration-grid{display:grid;grid-template-columns:minmax(220px,.95fr) minmax(220px,.85fr) minmax(260px,1.2fr);gap:14px;direction:ltr;margin:18px 0}
+.laser-registration-grid>aside,.laser-registration-grid>section{direction:rtl;padding:16px;border:1px solid #fff;border-radius:20px;background:#ffffffaa;box-shadow:0 5px 18px #7c539610;min-width:0}
+.laser-registration h3{font-size:17px;margin:0 0 14px}.laser-registration h4{margin:0;font-size:16px}.laser-registration h4 small{display:block;margin-top:6px}
+.laser-client-card dl{margin:12px 0}.laser-client-card dt{font-size:12px;color:#73657d}.laser-client-card dd{margin:5px 0 14px;padding:10px;background:#ffffff9c;border:1px solid #eee7f3;border-radius:10px;font-weight:600}.laser-gender{display:inline-block;border-radius:20px;background:#8a58a7;color:white;padding:8px 20px}
+.laser-client-card .treatment-figures{gap:0}.laser-client-card .treatment-figures figure{min-width:0;margin:0}.laser-client-card svg{width:100%;height:auto}
+.laser-catalogue-tabs{display:flex;gap:8px;margin-bottom:12px}.laser-catalogue-tabs button{flex:1;border-radius:24px;background:#eee8f4;border:1px solid white}.laser-catalogue-tabs button[aria-pressed=true]{background:#8750a6;color:white}
+.laser-catalogue-area{display:flex!important;align-items:center;gap:9px;padding:10px 8px;border-radius:10px;margin:4px 0;background:#faf8fd}.laser-catalogue-area span{flex:1}.laser-catalogue-area strong{font-size:13px}.laser-catalogue-area.selected{background:#ebdcf6;border:1px solid #c8a8dd}
+.laser-registration input[type=checkbox],.laser-registration input[type=radio]{width:18px;min-height:18px;height:18px;accent-color:#8549a7;flex-shrink:0}
+.laser-offer-list{margin-top:14px;border-top:1px solid #e6d8ef;padding-top:12px}.laser-offer-list summary{cursor:pointer;font-weight:600}.laser-offer{display:flex!important;gap:8px;padding:12px 0}.laser-offer small{display:block;margin-top:5px}
+.laser-assessment-card{background:#fff9;border:1px solid white;border-radius:16px;padding:14px;margin-bottom:14px}.laser-assessment-card header{display:flex;justify-content:space-between;gap:10px;align-items:flex-start}.laser-assessment-card header button{font-size:12px;color:#a83c66}
+.laser-assessment{border:0;margin:12px 0;padding:0;display:flex;flex-wrap:wrap;gap:5px}.laser-assessment legend{font-size:12px;margin-bottom:6px}.laser-assessment label{position:relative;display:flex;align-items:center;gap:4px;cursor:pointer;background:#f0eaf5;border-radius:10px;padding:7px;font-size:12px}.laser-assessment label:has(input:checked){background:#8750a6;color:white}.laser-assessment label input{width:13px!important;height:13px!important;min-height:13px!important}.laser-assessment-card textarea{min-height:64px;background:#faf7fc}
+.laser-registration-footer{padding:14px;border:1px solid white;border-radius:18px;background:#ffffffaa}.laser-registration-footer strong{font-size:27px;display:block}.laser-registration-footer p{max-width:310px;font-size:12px}.laser-registration-footer del{display:block;color:#80668e}.laser-registration-footer .crm-primary{min-height:48px;padding-inline:28px;background:linear-gradient(#a174bd,#713990)}
+.laser-selection-summary{display:flex;gap:12px;align-items:center;flex-wrap:wrap;padding:14px;margin:10px 0;background:#f4ecfa;border-radius:12px}
+@media(max-width:1000px){.laser-registration-grid{grid-template-columns:1fr 1fr}.laser-client-card{grid-column:1/-1}.laser-client-card .treatment-figures{max-width:350px;margin:auto}.laser-registration{padding:10px}}
+@media(max-width:600px){.laser-registration-grid{grid-template-columns:1fr}.laser-registration-grid>aside,.laser-registration-grid>section{grid-column:auto}.laser-registration-footer{display:block}.laser-registration-footer button{width:100%;margin-top:12px}.laser-registration-heading h2{font-size:21px}}
+.customer-catalogue,.customer-catalogue-detail{padding:16px;border:1px solid #e8dced;border-radius:18px;background:#fbf9ff}
+.customer-category-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px}
+.customer-category-grid button{padding:24px 12px;min-height:100px;background:linear-gradient(140deg,#fff,#eee1f7);border:1px solid #dfccea;border-radius:16px;color:#663786}
+.customer-category-grid small{display:block;margin-top:8px;color:#796283}
+.customer-catalogue header,.customer-catalogue-detail footer{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap}
+.customer-catalogue-list{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:12px}
+.customer-catalogue-list article{padding:16px;background:white;border:1px solid #eadfee;border-radius:14px;min-width:0}.customer-catalogue-list article>strong,.customer-catalogue-list article>small{display:block;margin:10px 0}.customer-catalogue-list label{display:flex!important;align-items:center;gap:8px}.customer-catalogue-list img{height:64px;width:64px;object-fit:cover;border-radius:12px}
+.customer-catalogue input[type=checkbox],.catalogue-price-options input[type=radio]{width:18px;min-height:18px;height:18px;accent-color:#8950a6}
+.catalogue-selected{margin-top:18px}.catalogue-selected>span{display:inline-flex;gap:8px;align-items:center;padding:6px 10px;background:#f0e4f6;border-radius:12px;margin:4px}.catalogue-selected button{padding:3px 8px}
+.catalogue-price-options{border:1px solid #e2d0ef;border-radius:12px;margin:14px 0;padding:12px}.catalogue-price-options label{display:flex!important;align-items:center;gap:12px;padding:12px;background:#f4edf9;margin:6px 0;border-radius:10px}.catalogue-price-options label span{flex:1}
+.catalogue-price-editor{padding:14px;background:#faf6ff;margin-bottom:18px;border-radius:14px}.catalogue-price-editor fieldset{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.crm-form-grid>div:has(.customer-catalogue),.crm-form-grid>div:has(.customer-catalogue-detail){grid-column:1/-1}
+@media(max-width:700px){.customer-category-grid,.customer-catalogue-list{grid-template-columns:1fr 1fr}.catalogue-price-editor fieldset{grid-template-columns:1fr}}
+@media(max-width:430px){.customer-catalogue-list{grid-template-columns:1fr}}
+.crm-dialog .laser-registration-footer,.crm-dialog .customer-catalogue-detail footer{position:static;bottom:auto;color:#32223f;background:#faf6fe;border:1px solid #e5d6ee;padding:16px;margin-top:14px}
+.crm-dialog .laser-registration-footer .crm-primary{color:#fff;background:linear-gradient(#a174bd,#713990)}
+.crm-dialog .laser-registration-heading{position:static;top:auto;background:transparent}
+.laser-assessment-card>label{display:flex;flex-direction:column;gap:6px}.laser-assessment-card textarea{width:100%}
+.laser-client-card .treatment-figures figure{display:flex;flex-direction:column}.laser-client-card figcaption{order:2}
+.crm-dialog:has(.laser-registration)>form>.crm-form-grid>:not(:has(.laser-registration)),.crm-dialog:has(.customer-catalogue-detail)>form>.crm-form-grid>:not(:has(.customer-catalogue-detail)){display:none}
+.crm-dialog:has(.laser-registration)>form>header,.crm-dialog:has(.laser-registration)>form>footer,.crm-dialog:has(.customer-catalogue-detail)>form>header,.crm-dialog:has(.customer-catalogue-detail)>form>footer{display:none}
+.crm-dialog:has(.laser-registration)>form>.crm-link,.crm-dialog:has(.customer-catalogue-detail)>form>.crm-link{display:none}
+.crm-dialog:has(.laser-registration)>form>.crm-form-grid{display:block}
+.crm-dialog .laser-registration-footer .crm-primary:enabled{opacity:1;color:white}
+.crm-dialog .laser-registration-footer{position:sticky;bottom:0;z-index:3;background:#f7f0fc}

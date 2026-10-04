@@ -75,8 +75,14 @@ export function scope(u:Actor,r:string):any {
  if(['staff','leaves'].includes(r)&&u.role==='STAFF')return r==='staff'?{id:u.staffId??'__none__'}:{staffId:u.staffId??'__none__'};
  return {};
 }
+export function catalogueInterestVisible(u:Actor,item:any){
+ if(item.kind==='COLLEGE')return allowed(u,'collegeCourses')&&(u.role!=='TRAINER'||item.trainerId===u.id);
+ if(item.kind==='EVENT')return allowed(u,'eventPackages')&&(u.role!=='EVENT_MANAGER'||item.managerId===u.id);
+ return false;
+}
 export function sanitize(u:Actor,r:string,row:any):any {
  const out={...row};
+ if(r==='customers'&&out.catalogueInterests)out.catalogueInterests={items:(out.catalogueInterests.items??[]).filter((item:any)=>catalogueInterestVisible(u,item))};
  if(!owners(u)){delete out.purchasePrice;delete out.margin;}
  for(const key of ['passwordHash','sessionVersion','content','imageBytes'])delete out[key];
  if(!financial(u)) {

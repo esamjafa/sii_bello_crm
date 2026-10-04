@@ -1,4 +1,5 @@
 import {resolve} from 'node:path';
+import {verifyLaserRegistrationBrowser} from './crm-laser-registration-browser.mjs';
 export async function verifyOctoberBrowser({browser,base,db,check,output,cookies}){
  const laser=await db.service.findFirst({where:{name:'ليزر قبول أكتوبر'}});
  const hair=await db.service.findFirst({where:{name:'شعر قبول أكتوبر'}});
@@ -8,7 +9,7 @@ export async function verifyOctoberBrowser({browser,base,db,check,output,cookies
  const context=await browser.newContext({viewport:{width:1440,height:1000}});const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
  await page.goto(base+'/book');await page.getByRole('button',{name:'ليزر',exact:true}).click();await page.getByRole('button',{name:/ليزر قبول أكتوبر/}).click();
  await page.getByRole('button',{name:'الوجه',exact:true}).click();
- check('Body map synchronizes selected laser checkbox',await page.getByLabel(/وجه تجريبي/).isChecked());
+ check('Body map synchronizes selected laser checkbox',await page.getByRole('checkbox',{name:/وجه تجريبي/}).isChecked());
  await page.getByLabel(/ذراعان تجريبيان/).check();
  check('Laser list updates both front and back maps',await page.getByRole('button',{name:'الذراعان',exact:true}).first().getAttribute('aria-pressed')==='true');
  await page.getByLabel(/عرض اختبار/).check();
@@ -36,5 +37,5 @@ export async function verifyOctoberBrowser({browser,base,db,check,output,cookies
  await drawer.getByRole('button',{name:'إغلاق',exact:true}).click();check('Closing service details preserves search',await staffPage.getByRole('textbox',{name:'بحث في القائمة'}).inputValue()===laser.name);
  await staffPage.getByRole('button',{name:new RegExp(laser.name)}).click();await staffPage.setViewportSize({width:390,height:844});
  check('Service details fit mobile screen',await drawer.evaluate(el=>el.scrollWidth<=window.innerWidth));await staffPage.screenshot({path:resolve(output,'oct02-service-mobile.png'),fullPage:true});
- await staffContext.close();await db.service.updateMany({where:{id:{in:publishedIds}},data:{onlineBookable:false}});
+ await staffContext.close();await verifyLaserRegistrationBrowser({browser,base,db,check,output,cookies});await db.service.updateMany({where:{id:{in:publishedIds}},data:{onlineBookable:false}});
 }

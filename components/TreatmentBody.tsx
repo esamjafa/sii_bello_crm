@@ -10,7 +10,7 @@ export default function TreatmentBody({selected,available,onToggle,gender='FEMAL
  {side?<path d="M85 70Q70 20 109 21Q148 20 134 71L118 90H98Z" fill="#65433e"/>:<><path d="M83 48Q81 17 111 21Q140 24 136 49Q125 45 115 30Q103 45 83 48" fill="#65433e"/><path d="M93 58h8m16 0h8m-21 20q6 4 12 0M110 60l-3 9 5 1" fill="none" stroke="#8c6157" strokeWidth="1.5"/></>}
  {gender==='FEMALE'&&<ellipse cx="109" cy="16" rx="16" ry="12" fill="#65433e"/>}
  {gender==='MALE'?<path d="M81 111L97 103Q109 114 121 103L141 112L150 151L138 154L139 229H78L80 154L68 151Z" fill="#fffafa" stroke="#c9b3c4"/>:<path d="M81 114l6-9 6 29q17 10 35 0l6-29 6 9-1 57q-29 10-58 0Z" fill="#fffafa" stroke="#c9b3c4"/>}
- <path d="M72 238q37 16 78 0l-11 35-28 12-27-12Z" fill="#fffafa" stroke="#c9b3c4"/>
+ <path d={gender==='MALE'?'M72 238q37 16 78 0l-6 89h-29l-6-43-6 43H76Z':'M72 238q37 16 78 0l-5 65h-28l-8-27-8 27H76Z'} fill="#fffafa" stroke="#c9b3c4"/>
  {Object.entries(regions).filter(([r,p])=>available.includes(r)&&(p.side===side||['ARMS','LEGS'].includes(r))).map(([r,p])=><g key={r} role="button" tabIndex={0} aria-label={regionLabels[r]} aria-pressed={selected.includes(r)} onClick={()=>onToggle(r)} onKeyDown={e=>{if(e.key==='Enter'||e.key===' '){e.preventDefault();onToggle(r);}}} style={{cursor:'pointer'}}><title>{regionLabels[r]}</title><circle cx={p.x} cy={p.y} r="17" fill={selected.includes(r)?'#9772b666':'#fff4'} stroke={selected.includes(r)?'#775197':'#a37cb0'} strokeWidth="2"/><circle cx={p.x} cy={p.y} r="4" fill={selected.includes(r)?'#775197':'#71456f'}/></g>)}
  </svg></figure>)}</div>;
 }

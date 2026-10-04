@@ -1,3 +1,4 @@
+import {verifyCategoryCatalogue} from './crm-category-catalogue-tests.mjs';
 export async function verifyOctober({req,check,db,users,customers,create}){
  const configuration={areas:[{id:'face',name:'وجه تجريبي',region:'FACE',price:100},{id:'arms',name:'ذراعان تجريبيان',region:'ARMS',price:150}],offers:[{id:'pair',name:'عرض اختبار',areaIds:['face','arms'],price:200}]};
  const laser=await create('services',{name:'ليزر قبول أكتوبر',department:'LASER',price:0,durationMinutes:60,bufferMinutes:20,resourceKey:'TEST_DEVICE',onlineBookable:true,configuration});
@@ -40,7 +41,37 @@ export async function verifyOctober({req,check,db,users,customers,create}){
  check('Employee cannot read another employee session photo for shared customer',(await req(`/api/crm-documents?id=${image.data.id}`,{role:'STAFF'})).status===404);
  check('Photo keeps exact appointment association',(await db.customerDocument.findUnique({where:{id:image.data.id}})).appointmentId===imageAppointment.id);
  check('Customer preferences retain only chosen service details',(await req('/api/crm/customers',{method:'PATCH',body:{id:customers.ADMIN.id,preferredServiceId:hair.id,servicePreferences:{kind:'COLOR',color:'بني',shade:'5'}}})).data.servicePreferences?.shade==='5');
+ const multi=[{serviceId:hair.id,details:{kind:'COLOR',color:'brown',shade:'5'}},{serviceId:laser.id,details:{areaIds:['face']}}];
+ const updateServices=services=>req('/api/crm/customers',{method:'PATCH',body:{id:customers.ADMIN.id,servicePreferences:{services}}});
+ const multiSaved=await updateServices(multi);
+ check('Customer multiple services retain independent details',multiSaved.status===200&&multiSaved.data.servicePreferences?.services?.[0]?.details.shade==='5'&&multiSaved.data.servicePreferences?.services?.[1]?.details.areaIds[0]==='face');
+ check('Customer duplicate service selection rejected',(await updateServices([multi[0],multi[0]])).status===400);
+ check('Customer unknown service selection rejected',(await updateServices([{serviceId:'missing-service',details:{}}])).status===400);
+ const cleared=await updateServices([]);
+ check('Customer all services can be cleared',cleared.status===200&&cleared.data.preferredServiceId===null&&cleared.data.servicePreferences.services.length===0&&cleared.data.interestedIn==='');
+ const linked=await db.laserPlan.findUnique({where:{registrationKey:`customer:${customers.ADMIN.id}:service:${laser.id}`}});
+ check('Laser catalogue saves a linked client package',linked?.customerId===customers.ADMIN.id&&Number(linked.price)===100&&linked.catalogueSelection.areas[0].id==='face');
+ await updateServices(multi);await updateServices(multi);
+ check('Repeated customer save does not duplicate laser package',await db.laserPlan.count({where:{registrationKey:linked.registrationKey}})===1);
+ check('Laser registration does not consume a session',await db.laserSession.count({where:{planId:linked.id}})===0);
+ check('Gender is mandatory when creating a customer',(await req('/api/crm/customers',{method:'POST',body:{name:'Missing gender',phone:'972500006661',gender:undefined}})).status===400);
+ check('Laser catalogue gender cannot contradict customer',(await updateServices([{serviceId:laser.id,details:{gender:'MALE',areaIds:['face']}}])).status===400);
+ const packageConfig={...configuration,offers:[...configuration.offers,{id:'three',name:'باقة ثلاث جلسات',areaIds:['face'],price:240,sessionsTotal:3}]};
+ await db.service.update({where:{id:laser.id},data:{configuration:packageConfig}});
+ const packageDetails={gender:'FEMALE',areaIds:['face'],offerId:'three',hairAssessments:{face:{color:'BROWN',texture:'SOFT',density:'LIGHT',notes:'اختبار حفظ خصائص المنطقة'}}};
+ check('Configured mult-session laser offer can be registered',(await updateServices([{serviceId:laser.id,details:packageDetails}])).status===200);
+ const bought=await db.laserPlan.findUnique({where:{id:linked.id}});
+ check('Laser package stores configured price sessions and hair details',Number(bought.price)===240&&bought.sessionsTotal===3&&bought.catalogueSelection.details.hairAssessments.face.color==='BROWN');
+ check('Laser assessment for unselected region rejected',(await updateServices([{serviceId:laser.id,details:{...packageDetails,hairAssessments:{arms:{color:'BLACK'}}}}])).status===400);
+ await db.laserSession.create({data:{planId:linked.id}});
+ check('Executed package cannot be overwritten by registration',(await updateServices([{serviceId:laser.id,details:{gender:'FEMALE',areaIds:['arms']}}])).status===400);
+ const changedPrices={...packageConfig,offers:packageConfig.offers.map(o=>o.id==='three'?{...o,price:270}:o)};
+ await db.service.update({where:{id:laser.id},data:{configuration:changedPrices}});
+ const preserved=await updateServices([{serviceId:laser.id,details:packageDetails}]);
+ check('Saving existing laser purchase preserves original price after catalogue changes',preserved.status===200&&preserved.data.servicePreferences.services[0].price==='240'&&Number((await db.laserPlan.findUnique({where:{id:linked.id}})).price)===240);
+ await db.service.update({where:{id:laser.id},data:{configuration:packageConfig}});
  const filtered=await req(`/api/crm/appointments?day=2028-04-02&period=DAY&staffId=${a.id}&serviceId=${laser.id}`);
  check('Appointment date employee and service filters are combined',filtered.status===200&&filtered.data.rows.length>0&&filtered.data.rows.every(x=>x.staffId===a.id&&x.serviceId===laser.id&&x.startsAt.startsWith('2028-04-02')));
  await db.service.update({where:{id:laser.id},data:{onlineBookable:false}});
+ await verifyCategoryCatalogue({req,check,db,users,customers,create});
 }

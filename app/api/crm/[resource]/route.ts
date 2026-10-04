@@ -5,12 +5,14 @@ import { CrmError, appointmentAvailability, bookingOptions, customerOptions, cus
 import { SchedulingConflict } from '@/lib/scheduling';
 import { sectionSummary } from '@/lib/crm-section-summary';
 import { departmentScreen } from '@/lib/crm-department-screen';
+import { customerCatalogue } from '@/lib/customer-catalogue';
 export const dynamic='force-dynamic';
 async function handle(request:Request,context:{params:Promise<{resource:string}>}){
  const user=await currentUser();if(!user)return NextResponse.json({error:'انتهت جلسة الدخول؛ سجّلي الدخول مجددًا ثم أعيدي المحاولة',code:'SESSION_EXPIRED'},{status:401});
  const {resource}=await context.params;
  try{
    const url=new URL(request.url);
+   if(request.method==='GET'&&resource==='catalogue')return NextResponse.json(await customerCatalogue(user,url));
    if(request.method==='GET'&&resource==='department-screen')return NextResponse.json(await departmentScreen(user,url.searchParams.get('section')??'',url.searchParams.get('eventId')??''));
    if(request.method==='GET'&&['staff-options','service-options'].includes(resource))return NextResponse.json(await bookingOptions(user,resource,url));
    if(request.method==='GET'&&resource==='availability')return NextResponse.json(await appointmentAvailability(user,url));

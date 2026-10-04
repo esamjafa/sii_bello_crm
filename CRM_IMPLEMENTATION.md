@@ -15,5 +15,7 @@ Implementation rules:
 
 Validation includes production build, database migration/backfill, role/ownership
 matrix, concurrent payments/stock/booking, archive and audit history, HTTP security,
-browser desktop/mobile flows, and dependency audit. Findings and coverage limits go
-in CRM_REGRESSION_REPORT.md. Passing tests does not establish absence of all defects.
+browser desktop/mobile flows, and dependency audit. Keep machine-generated test
+results in audit-results and summarize findings in the conversation. Do not create
+per-request Markdown reports unless explicitly requested. Passing tests does not
+establish absence of all defects.

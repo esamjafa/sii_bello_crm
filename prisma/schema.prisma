@@ -69,6 +69,8 @@ model User {
 }
 
 model Customer {
+  catalogueInterests Json?
+  gender String?
   preferredServiceId String?
   servicePreferences Json?
   consents ConsentRecord[]
@@ -465,6 +467,8 @@ model EventContact {
 }
 
 model LaserPlan {
+  registrationKey String? @unique
+  catalogueSelection Json?
   category String @default("LASER")
   price Decimal @default(0)
   archivedAt DateTime?

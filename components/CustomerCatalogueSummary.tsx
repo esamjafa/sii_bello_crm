@@ -1,0 +1,6 @@
+const labels:Record<string,string>={CUT:'قص الشعر',COLOR:'صبغة',EXTENSIONS:'وصلات',SHORT:'قصير',MEDIUM:'متوسط',LONG:'طويل',COLLEGE:'الكلية',EVENT:'الإيفنت'};
+export default function CustomerCatalogueSummary({customer}:{customer:any}){
+ const services=customer.servicePreferences?.services??[],interests=customer.catalogueInterests?.items??[];
+ if(!services.length&&!interests.length)return null;
+ return <section className="crm-panel"><h3>اختيارات الكتالوج</h3>{services.map((s:any)=><details key={s.serviceId}><summary>{s.name??'خدمة مختارة'}{s.price!==undefined?` · ${s.price} ${s.currency==='ILS'?'₪':s.currency}`:''}</summary><p>{[labels[s.details.kind],labels[s.details.hairLength],s.details.extensionColor,s.details.extensionLength?`${s.details.extensionLength} سم`:null,s.details.extensionQuantity?`${s.details.extensionQuantity} وصلة`:null].filter(Boolean).join(' · ')}</p>{s.details.notes&&<p>{s.details.notes}</p>}{s.details.areaIds&&<p>تفاصيل باقة الليزر والجلسات في تبويب الخدمات والباقات.</p>}</details>)}{interests.map((i:any)=><p key={i.kind+i.id}>{labels[i.kind]} · {i.name} · {i.price} {i.currency} — اهتمام، لم يؤكد التسجيل</p>)}<small>هذه الاختيارات لا تمثل دفعات مؤكدة.</small></section>;
+}

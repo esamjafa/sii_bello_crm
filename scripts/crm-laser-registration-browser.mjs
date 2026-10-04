@@ -1,0 +1,38 @@
+import {resolve} from 'node:path';
+export async function verifyLaserRegistrationBrowser({browser,base,db,check,output,cookies}){
+ const context=await browser.newContext({viewport:{width:1440,height:1050}});
+ await context.addCookies([{name:'salon_session',value:cookies.ADMIN,domain:'localhost',path:'/'}]);
+ const page=await context.newPage();const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ await page.goto(base);await page.getByRole('button',{name:'إضافة عميلة',exact:true}).click();const form=page.getByRole('dialog');
+ await form.getByLabel('الاسم الكامل',{exact:false}).fill('تسجيل ليزر نساء');await form.getByLabel('رقم الهاتف',{exact:true}).fill('0500006767');
+ await form.getByRole('button',{name:'الليزر فتح الخدمات',exact:true}).click();
+ check('Laser catalogue blocked until personal gender selected',await form.getByText('أكملي الاسم والهاتف واختاري الجنس أولًا').isVisible());
+ await form.getByLabel('الجنس',{exact:false}).selectOption('FEMALE');await form.getByRole('button',{name:'الليزر فتح الخدمات',exact:true}).click();await form.getByRole('checkbox',{name:'ليزر قبول أكتوبر',exact:true}).click();
+ const catalogue=form.getByRole('region',{name:'كتالوج تسجيل الليزر'});await catalogue.waitFor();
+ check('Female laser checkbox opens matching catalogue',await catalogue.getByText('♀ أنثى',{exact:true}).isVisible());
+ await catalogue.getByRole('button',{name:'الوجه',exact:true}).click();check('Registration body map selects matching area',await catalogue.getByRole('checkbox',{name:/وجه تجريبي/}).isChecked());
+ await catalogue.getByRole('radio',{name:/باقة ثلاث جلسات/}).check();
+ await catalogue.getByRole('radio',{name:'بني',exact:true}).check();await catalogue.getByRole('radio',{name:'ناعم',exact:true}).check();await catalogue.getByRole('radio',{name:'قليلة',exact:true}).check();
+ await catalogue.getByLabel('ملاحظات المنطقة').fill('ملاحظة خاصة بالمنطقة');
+ await page.screenshot({path:resolve(output,'laser-registration-female-desktop.png'),fullPage:true});
+ await page.setViewportSize({width:390,height:844});check('Laser registration fits mobile viewport',await catalogue.evaluate(el=>el.scrollWidth<=window.innerWidth));await page.screenshot({path:resolve(output,'laser-registration-female-mobile.png'),fullPage:true});
+ await catalogue.getByRole('button',{name:'اعتماد اختيارات الليزر'}).click();await form.getByRole('button',{name:'حفظ',exact:true}).click();await page.getByRole('heading',{name:'تسجيل ليزر نساء',exact:true}).waitFor();
+ const customer=await db.customer.findUnique({where:{phone:'972500006767'}});const plan=await db.laserPlan.findFirst({where:{customerId:customer.id}});
+ check('Browser laser purchase links package price sessions and gender',customer.gender==='FEMALE'&&Number(plan.price)===240&&plan.sessionsTotal===3&&plan.catalogueSelection.details.hairAssessments.face.notes==='ملاحظة خاصة بالمنطقة');
+ check('Browser laser registration leaves sessions unused',await db.laserSession.count({where:{planId:plan.id}})===0);
+ await page.setViewportSize({width:1440,height:1050});await page.getByRole('button',{name:'إضافة عميلة',exact:true}).click();await form.getByLabel('الاسم الكامل',{exact:false}).fill('تسجيل ليزر رجال');await form.getByLabel('رقم الهاتف',{exact:true}).fill('0500006768');await form.getByLabel('الجنس',{exact:false}).selectOption('MALE');await form.getByRole('button',{name:'الليزر فتح الخدمات',exact:true}).click();await form.getByRole('checkbox',{name:'اختبار قواعد الليزر أكتوبر ٢',exact:true}).click();
+ await catalogue.getByRole('button',{name:'اللحية',exact:true}).click();check('Male laser map includes selectable beard',await catalogue.getByRole('checkbox',{name:/اللحية/}).isChecked());
+ await page.screenshot({path:resolve(output,'laser-registration-male-desktop.png'),fullPage:true});
+ await catalogue.getByRole('button',{name:'اعتماد اختيارات الليزر'}).click();await form.getByRole('button',{name:'حفظ',exact:true}).click();await page.getByRole('heading',{name:'تسجيل ليزر رجال',exact:true}).waitFor();
+ const man=await db.customer.findUnique({where:{phone:'972500006768'}});const manPlan=await db.laserPlan.findFirst({where:{customerId:man.id}});check('Male beard package saved in correct client file',man.gender==='MALE'&&manPlan.catalogueSelection.details.areaIds.includes('beard'));
+ await page.getByRole('button',{name:'إضافة عميلة',exact:true}).click();await form.getByLabel('الاسم الكامل',{exact:false}).fill('اختبار كتالوج الشعر');await form.getByLabel('رقم الهاتف',{exact:true}).fill('0500006769');await form.getByLabel('الجنس',{exact:false}).selectOption('FEMALE');
+ await page.screenshot({path:resolve(output,'customer-catalogue-categories.png'),fullPage:true});
+ await form.getByRole('button',{name:'صالون الشعر فتح الخدمات',exact:true}).click();await form.getByRole('checkbox',{name:'كتالوج شعر تجريبي',exact:true}).click();
+ const detail=form.getByRole('region',{name:'تفاصيل الخدمة المختارة'});await detail.getByRole('radio',{name:/وصلات سوداء 60 سم/}).check();
+ check('Hair catalogue fills extension attributes from priced option',await detail.getByLabel('لون الوصلات',{exact:true}).inputValue()==='أسود'&&await detail.getByLabel('طول الوصلات (سم)').inputValue()==='60');
+ await page.screenshot({path:resolve(output,'hair-extension-catalogue.png'),fullPage:true});await detail.getByRole('button',{name:'اعتماد الخدمة',exact:true}).click();
+ await form.getByRole('button',{name:'جميع الأقسام',exact:true}).click();await form.getByRole('button',{name:'الكلية فتح الخدمات',exact:true}).click();await form.getByRole('checkbox',{name:'دورة كتالوج تجريبية',exact:true}).check();
+ await form.getByRole('button',{name:'حفظ',exact:true}).click();await page.getByRole('heading',{name:'اختبار كتالوج الشعر',exact:true}).waitFor();
+ const mixed=await db.customer.findUnique({where:{phone:'972500006769'}});check('Browser saves hair details and college interest in same client',mixed.servicePreferences.services[0].price==='500'&&mixed.catalogueInterests.items[0].name==='دورة كتالوج تجريبية');
+ check('Laser and category registration browser has no runtime errors',errors.length===0,errors);await context.close();
+}

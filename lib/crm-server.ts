@@ -1,10 +1,11 @@
 import { quoteService, serviceConfiguration } from './service-selection';
+import { isDeepStrictEqual } from 'node:util';
 import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { hash } from 'bcryptjs';
 import { prisma } from './prisma';
 import { crm, type CrmField } from './crm-config';
-import { actorDepartments, allowed, customerScope, fieldAllowed, financial, managers, owners, sanitize, scope, type Actor } from './crm-access';
+import { actorDepartments, allowed, catalogueInterestVisible, customerScope, fieldAllowed, financial, managers, owners, sanitize, scope, type Actor } from './crm-access';
 import { parseSchedule } from './staff-schedule';
 import { normalizePhone } from './phone';
 import { salonDayRange, salonMonthStart } from './business-time';
@@ -224,8 +225,46 @@ export async function mutateRecord(u:Actor,r:string,body:any,method:string){
   let combined={...previous,...data};
   if(updating&&['students','notes','tasks','laserPlans','hairSessions'].includes(r)&&data.customerId&&data.customerId!==previous.customerId)fail('لا يمكن نقل السجل التاريخي إلى عميلة أخرى');
   for(const key of ['amount','fee','price','originalAmount','originalPrice','discount','quotedPrice','offeredDiscount','purchasePrice','salePrice','cost','depositRequired','commissionRate'])if(data[key]!==undefined&&decimal(data[key]).decimalPlaces()>2)fail('المبالغ تقبل منزلتين عشريتين فقط');
+  const laserRegistrations:{serviceId:string;name:string;quote:ReturnType<typeof quoteService>}[]=[];
   if(r==='customers'){
-    if(combined.preferredServiceId&&(data.servicePreferences!==undefined||data.preferredServiceId!==undefined)){
+    if(!updating&&!data.gender)fail('اختاري الجنس في البيانات الشخصية');
+    if(data.catalogueInterests!==undefined){
+      const parsed=z.object({items:z.array(z.object({kind:z.enum(['COLLEGE','EVENT']),id:z.string().min(1).max(100)})).max(100).default([])}).strict().safeParse(data.catalogueInterests);
+      if(!parsed.success)fail('اختيارات الكتالوج غير صالحة');
+      const interests:any[]=[];const seen=new Set<string>();
+      for(const item of parsed.data!.items){
+        const key=item.kind+item.id;if(seen.has(key))fail('لا يمكن تكرار الاختيار');seen.add(key);
+        if(item.kind==='COLLEGE'){
+          if(!allowed(u,'collegeCourses'))fail('ليس لديك صلاحية الكلية',403);
+          const course=await db.collegeCourse.findFirst({where:{AND:[scope(u,'collegeCourses'),{id:item.id,active:true}]}});if(!course)fail('الدورة غير متاحة');
+          interests.push({...item,name:course.title,price:String(course.fee),currency:'ILS',trainerId:course.trainerId});
+        }else{
+          if(!allowed(u,'eventPackages'))fail('ليس لديك صلاحية الإيفنت',403);
+          const pack=await db.eventPackage.findFirst({where:{AND:[scope(u,'eventPackages'),{id:item.id,active:true,event:{archivedAt:null}}]},include:{event:true}});if(!pack)fail('باقة الإيفنت غير متاحة');
+          interests.push({...item,name:`${pack.event.name} · ${pack.name}`,price:String(pack.price),currency:pack.event.currency,managerId:pack.event.managerId});
+        }
+      }
+      data.catalogueInterests={items:[...(previous?.catalogueInterests?.items??[]).filter((item:any)=>!catalogueInterestVisible(u,item)),...interests]};
+      if(interests.length)data.departments=[...new Set([...(combined.departments??[]),...interests.map(item=>item.kind)])];
+    }
+    if(data.servicePreferences&&'services' in data.servicePreferences){
+      const parsed=z.object({services:z.array(z.object({serviceId:z.string().min(1),details:z.record(z.string(),z.unknown()),name:z.string().optional(),price:z.string().optional(),currency:z.string().optional()}).strict()).max(100)}).strict().safeParse(data.servicePreferences);
+      if(!parsed.success)fail('اختيارات الخدمات غير صالحة');
+      const entries=parsed.data!.services;
+      if(new Set(entries.map(e=>e.serviceId)).size!==entries.length)fail('لا يمكن اختيار الخدمة مرتين');
+      const services=await db.service.findMany({where:{id:{in:entries.map(e=>e.serviceId)},active:true}});
+      const selected=[];const names=[];
+      for(const entry of entries){
+        const service=services.find((s:any)=>s.id===entry.serviceId);if(!service)fail('الخدمة غير متاحة');
+        if(service.department==='LASER'){
+          if(!['FEMALE','MALE'].includes(combined.gender))fail('اختاري الجنس قبل تسجيل الليزر');
+          if(entry.details.gender&&entry.details.gender!==combined.gender)fail('نوع كتالوج الليزر لا يطابق جنس العميل');
+          if(!allowed(u,'laserPlans',true))fail('ليس لديك صلاحية تسجيل باقات الليزر',403);
+        }
+        try{const input=service.department==='LASER'?{...entry.details,gender:combined.gender}:entry.details;const saved=service.department==='LASER'&&previous?await db.laserPlan.findUnique({where:{registrationKey:`customer:${previous.id}:service:${service.id}`}}):null;const snapshot=saved?.catalogueSelection;const quote:ReturnType<typeof quoteService>=snapshot&&isDeepStrictEqual(snapshot.details,input)?snapshot:quoteService(service,input);selected.push({serviceId:entry.serviceId,name:service.name,price:String(quote.finalPrice),currency:quote.currency,details:quote.details});names.push(service.name);if(service.department==='LASER')laserRegistrations.push({serviceId:service.id,name:service.name,quote});}catch(e:any){fail(e.message);}
+      }
+      data.preferredServiceId=entries[0]?.serviceId??null;data.servicePreferences={services:selected};data.interestedIn=names.join('، ');
+    }else if(combined.preferredServiceId&&(data.servicePreferences!==undefined||data.preferredServiceId!==undefined)){
       const service=await db.service.findFirst({where:{id:combined.preferredServiceId,active:true}});if(!service)fail('الخدمة غير متاحة');
       try{const quote=quoteService(service,data.servicePreferences??{});data.servicePreferences=quote.details;data.interestedIn=service.name;}catch(e:any){fail(e.message);}
     }else if(data.servicePreferences&&Object.keys(data.servicePreferences).length)fail('اختاري الخدمة قبل إدخال تفاصيلها');
@@ -399,6 +438,18 @@ export async function mutateRecord(u:Actor,r:string,body:any,method:string){
     if(combined.staffId&&await db.employeeLeave.findFirst({where:{staffId:combined.staffId,status:'APPROVED',startsAt:{lte:combined.startsAt},endsAt:{gte:combined.startsAt}}}))fail('الموظفة في إجازة',409);
   }
   const result=updating?await model(db,r).update({where:{id:body.id},data}):await model(db,r).create({data});
+  for(const registration of laserRegistrations){
+    const registrationKey=`customer:${result.id}:service:${registration.serviceId}`;
+    const existing=await db.laserPlan.findUnique({where:{registrationKey}});
+    const snapshot={serviceId:registration.serviceId,serviceName:registration.name,...registration.quote};
+    // Reopening or saving personal data must not reprice an existing package.
+    if(existing&&isDeepStrictEqual(existing.catalogueSelection?.details,snapshot.details))continue;
+    if(existing&&await db.laserSession.count({where:{planId:existing.id,archivedAt:null}}))fail('لا يمكن تغيير باقة بدأت جلساتها من التسجيل الأولي؛ افتحي الباقة من ملف العميل');
+    if(existing?.archivedAt)fail('الباقة السابقة مؤرشفة؛ راجعي سجل الباقات قبل إعادة التسجيل');
+    const planData={customerId:result.id,category:'LASER',area:`${registration.name} · ${registration.quote.offer?.name??registration.quote.areas.map(a=>a.name).join('، ')}`,price:registration.quote.finalPrice,sessionsTotal:registration.quote.offer?.sessionsTotal??1,catalogueSelection:snapshot};
+    const plan=existing?await db.laserPlan.update({where:{id:existing.id},data:planData}):await db.laserPlan.create({data:{...planData,registrationKey}});
+    await recordAudit(db,u,existing?'UPDATE':'CREATE','laserPlans',plan.id,existing,plan);
+  }
   if(r==='invoices'&&!updating&&decimal(initialPayment).gt(0)){const payment=await db.payment.create({data:{invoiceId:result.id,amount:decimal(initialPayment),method:paymentMethod,kind:'PAYMENT',notes:paymentNote,receivedById:u.id,idempotencyKey:`invoice:${key}`}});await refreshInvoice(db,result.id);await recordAudit(db,u,'CREATE','payments',payment.id,null,payment);result.paidAmount=decimal(initialPayment);result.status=decimal(initialPayment).eq(result.amount)?'PAID':'PARTIAL';}
   if(r==='customers'&&updating){await db.student.updateMany({where:{customerId:result.id},data:{name:result.name,phone:result.phone,email:result.email}});await db.eventLead.updateMany({where:{customerId:result.id},data:{name:result.name,phone:result.phone}});}
   if(r==='payments')await refreshInvoice(db,result.invoiceId);

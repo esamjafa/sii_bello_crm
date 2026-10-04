@@ -1,6 +1,6 @@
 # Sii Bello Saloon CRM
 
-Next.js operational CRM with PostgreSQL, a unified customer profile, salon, college, events, inventory, immutable payments, follow-ups, and server-enforced role access. The operational workspace is Arabic RTL with the charcoal, plum and rose design supplied in September 2026. See [operations guide](CRM_OPERATIONS.md) and [regression report](CRM_REGRESSION_REPORT.md).
+Next.js operational CRM with PostgreSQL, a unified customer profile, salon, college, events, inventory, immutable payments, follow-ups, and server-enforced role access. The operational workspace is Arabic RTL. See the [operations guide](CRM_OPERATIONS.md).
 
 ## Local setup
 
@@ -12,6 +12,8 @@ Next.js operational CRM with PostgreSQL, a unified customer profile, salon, coll
 6. Run `npm run dev` and open `http://localhost:3000`.
 
 ## Version control and checks
+
+Maintain existing documentation when needed. Do not create a separate Markdown report after each request unless explicitly requested; keep routine progress and test summaries in the conversation.
 
 The local Git repository uses `main`. Commit source, `package-lock.json`, Prisma schemas and migrations, and the reviewed `.env.example` and `.env.postgres.example` templates. Private environment files, certificates, database contents and dumps, backups, generated clients, and audit output are ignored. Review `git status` before committing; never force-add private files.
 
