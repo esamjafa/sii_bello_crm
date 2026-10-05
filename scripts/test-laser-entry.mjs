@@ -1,0 +1,31 @@
+import {build} from 'esbuild';
+import {chromium,expect} from '@playwright/test';
+import {readFile,mkdir} from 'node:fs/promises';
+const bundle=await build({stdin:{contents:`import React,{useState} from 'react';import{createRoot}from'react-dom/client';import{CustomerServices}from'./components/CustomerCatalogue';function Demo(){const[value,setValue]=useState({services:[]});const[gender,setGender]=useState('FEMALE');return <div className="crm-app"><dialog open className="crm-dialog"><form><header>بيانات العميل</header><label>الجنس<select aria-label="الجنس" value={gender} onChange={e=>setGender(e.target.value)}><option>FEMALE</option><option>MALE</option></select></label><div className="crm-form-grid"><div><CustomerServices serviceId="" value={value} onChange={(_,v)=>setValue(v)} customer={{name:'معاينة الاختبار',phone:'+972501234567',gender}} canRegisterLaser={!location.search.includes('denied')} interests={{items:[]}} onInterestsChange={()=>{}}/></div></div><footer>حفظ العميل</footer><output data-testid="selection">{JSON.stringify(value)}</output></form></dialog></div>}createRoot(document.getElementById('root')).render(<Demo/>);`,resolveDir:process.cwd(),loader:'tsx'},bundle:true,write:false,format:'iife',jsx:'automatic',define:{'process.env.NODE_ENV':'"production"'}});
+const layout=await readFile('app/layout.tsx','utf8');
+const css=(await Promise.all([...layout.matchAll(/import '\.\/(.*\.css)'/g)].map(m=>readFile('app/'+m[1],'utf8')))).join('\n');
+const browser=await chromium.launch({headless:true});
+try{
+ const page=await browser.newPage({viewport:{width:1440,height:1050}});const errors=[];page.on('pageerror',e=>errors.push(e.message));
+ const service={id:'test-laser',name:'كتالوج اختباري',kind:'SERVICE',category:'LASER',department:'LASER',price:0,currency:'ILS',configuration:{areas:[{id:'face',name:'الوجه',region:'FACE',price:100},{id:'beard',name:'اللحية',region:'BEARD',price:150,audience:'MALE'},{id:'legs',name:'الساقان',region:'LEGS',price:200}],offers:[{id:'package',name:'عرض اختباري',areaIds:['face','legs'],price:250,sessionsTotal:1}]}};
+ let rows=[service];
+ await page.route('**/*',route=>{if(route.request().url().includes('/api/crm/catalogue'))return route.fulfill({json:{categories:['LASER'],rows}});return route.fulfill({contentType:'text/html',body:'<html dir="rtl"><meta charset="utf-8"><div id="root"></div></html>'});});
+ const open=async(path='')=>{await page.goto('http://laser.test/'+path);await page.addStyleTag({content:css});await page.addScriptTag({content:bundle.outputFiles[0].text});};
+ await open();await page.getByRole('button',{name:'الليزر فتح الخدمات'}).click();
+ const screen=page.getByRole('region',{name:'كتالوج تسجيل الليزر'});
+ await expect(screen).toBeVisible();await expect(screen.getByText('♀ أنثى',{exact:true})).toBeVisible();await expect(screen.getByRole('checkbox',{name:/اللحية/})).toHaveCount(0);
+ await screen.getByRole('button',{name:'الوجه',exact:true}).click();await expect(screen.getByRole('checkbox',{name:/الوجه/})).toBeChecked();
+ await screen.getByRole('radio',{name:/عرض اختباري/}).check();await screen.getByRole('radio',{name:'بني',exact:true}).first().check();
+ const selection=()=>page.getByTestId('selection').textContent().then(JSON.parse);
+ if((await selection()).services[0].details.offerId!=='package')throw Error('Offer not retained');
+ await expect(screen.locator('.laser-registration-footer strong')).toContainText('250');
+ await mkdir('audit-results/laser-direct-entry',{recursive:true});await page.screenshot({path:'audit-results/laser-direct-entry/female.png',fullPage:true});
+ await screen.getByRole('button',{name:'اعتماد اختيارات الليزر'}).click();await page.getByRole('button',{name:'الليزر فتح الخدمات'}).click();await expect(screen.getByRole('checkbox',{name:/الوجه/})).toBeChecked();
+ await page.setViewportSize({width:390,height:844});if(await screen.evaluate(e=>e.scrollWidth>innerWidth))throw Error('Mobile overflow');await page.screenshot({path:'audit-results/laser-direct-entry/mobile.png',fullPage:true});
+ await screen.getByRole('button',{name:'العودة لبيانات العميل'}).click();await page.getByLabel('الجنس',{exact:true}).selectOption('MALE');await page.getByRole('button',{name:'الليزر فتح الخدمات'}).click();await expect(screen.getByText('♂ ذكر',{exact:true})).toBeVisible();await screen.getByRole('button',{name:'اللحية',exact:true}).click();await expect(screen.getByRole('checkbox',{name:/اللحية/})).toBeChecked();
+ await page.setViewportSize({width:1440,height:1050});await page.screenshot({path:'audit-results/laser-direct-entry/male.png',fullPage:true});
+ await open('?denied');await page.getByRole('button',{name:'الليزر فتح الخدمات'}).click();await expect(page.getByRole('alert')).toContainText('ليس لديك صلاحية');await expect(screen).toHaveCount(0);
+ rows=[];await open();await page.getByRole('button',{name:'الليزر فتح الخدمات'}).click();await expect(screen.getByRole('status')).toContainText('لم تُضبط');await expect(screen.locator('.treatment-figures svg')).toHaveCount(2);await expect(screen.getByRole('checkbox',{name:/الوجه/})).toBeDisabled();await expect(screen.getByRole('button',{name:'اعتماد اختيارات الليزر'})).toBeDisabled();await expect(screen.getByRole('checkbox',{name:/اللحية/})).toHaveCount(0);
+ rows=[service,{...service,id:'second-laser',name:'كتالوج ثانٍ'}];await open();await page.getByRole('button',{name:'الليزر فتح الخدمات'}).click();await page.getByLabel('كتالوج الليزر',{exact:true}).selectOption('second-laser');await screen.getByRole('checkbox',{name:/الوجه/}).check();if((await selection()).services[0].serviceId!=='second-laser')throw Error('Wrong service linked');
+ if(errors.length)throw Error(errors.join('\n'));console.log('PASS: direct laser entry, female/male areas, map synchronization, offers and totals, retained selections, mobile, permissions, empty catalogue, multiple catalogues. No database writes.');
+}finally{await browser.close();}

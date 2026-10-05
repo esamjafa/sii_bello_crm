@@ -1,12 +1,12 @@
 'use client';
-import {useState} from 'react';
+import {useState,type ReactNode} from 'react';
 import TreatmentBody from './TreatmentBody';
-import {quoteService,type Selection,type ServiceConfiguration} from '@/lib/service-selection';
+import {quoteService,bodyRegions,regionLabels,type Selection,type ServiceConfiguration} from '@/lib/service-selection';
 
 export type LaserCatalogueService={id:string;name:string;department:string;price:unknown;configuration?:ServiceConfiguration};
 const upper=['BEARD','FACE','NECK','UNDERARMS','CHEST','ARMS','ABDOMEN','BACK','LOWER_BACK'];
 const money=(n:number)=>new Intl.NumberFormat('ar',{style:'currency',currency:'ILS'}).format(n);
-export default function LaserRegistrationCatalogue({service,customer,value,onChange,onClose}:{service:LaserCatalogueService;customer:Record<string,any>;value:Selection;onChange:(v:Selection)=>void;onClose:()=>void}){
+export default function LaserRegistrationCatalogue({service,customer,value,onChange,onClose,servicePicker,catalogueNotice}:{service:LaserCatalogueService;customer:Record<string,any>;value:Selection;onChange:(v:Selection)=>void;onClose:()=>void;servicePicker?:ReactNode;catalogueNotice?:string}){
  const [group,setGroup]=useState('ALL'),[error,setError]=useState('');
  const gender=customer.gender as 'FEMALE'|'MALE',male=gender==='MALE';
  const config=service.configuration??{areas:[],offers:[]};
@@ -27,10 +27,12 @@ export default function LaserRegistrationCatalogue({service,customer,value,onCha
  const choices=(id:string,key:'color'|'texture'|'density',title:string,options:string[][])=><fieldset className="laser-assessment"><legend>{title}</legend>{options.map(([v,text])=><label key={v}><input type="radio" name={`${service.id}-${id}-${key}`} checked={value.hairAssessments?.[id]?.[key]===v} onChange={()=>assessment(id,key,v)}/><span>{text}</span></label>)}</fieldset>;
  return <section className="laser-registration" aria-label="كتالوج تسجيل الليزر" dir="rtl">
   <header className="laser-registration-heading"><div><h2>ليزر · تسجيل أولي</h2><p>{service.name} · اختيار المناطق والباقة — {male?'ذكر':'أنثى'}</p></div><button type="button" onClick={onClose}>العودة لبيانات العميل</button></header>
+  {servicePicker}
+  {catalogueNotice&&<p className="laser-setup-notice" role="status">{catalogueNotice}</p>}
   <div className="laser-registration-grid">
    <aside className="laser-client-card"><h3>معلومات {male?'الزبون':'الزبونة'}</h3><span className="laser-gender">{male?'♂ ذكر':'♀ أنثى'}</span><dl><dt>الاسم الكامل</dt><dd>{customer.name}</dd><dt>رقم الهاتف</dt><dd dir="ltr">{customer.phone}</dd></dl><TreatmentBody gender={gender} available={[...new Set(areas.map(a=>a.region))]} selected={[...new Set(selected.flatMap(a=>a.coverage??[a.region]))]} onToggle={region=>{const area=areas.find(a=>a.region===region);if(area)select(area.id);}}/><small>الجنس محدد في البيانات الشخصية. اختيار الرسم والقائمة متزامن.</small></aside>
    <section className="laser-area-catalogue"><h3>المناطق المطلوبة</h3><div className="laser-catalogue-tabs">{[['ALL','الكل'],['UPPER','علوي'],['LOWER','سفلي']].map(([v,t])=><button type="button" key={v} aria-pressed={group===v} onClick={()=>setGroup(v)}>{t}</button>)}</div>
-    {!areas.length&&<p role="status">لم تُضبط مناطق وأسعار هذا الكتالوج لهذا الجنس بعد. أضيفيها من إعدادات الخدمة.</p>}
+    {!areas.length&&<>{!catalogueNotice&&<p role="status">لم تُضبط مناطق وأسعار هذا الكتالوج لهذا الجنس بعد. أضيفيها من إعدادات الخدمة.</p>}{bodyRegions.filter(r=>(male||r!=='BEARD')&&(group==='ALL'||(group==='UPPER'?upper.includes(r):!upper.includes(r)))).map(r=><label className="laser-catalogue-area laser-unconfigured-area" key={r}><input type="checkbox" disabled/><span>{regionLabels[r]}</span><small>السعر غير محدد</small></label>)}</>}
     {areas.filter(a=>group==='ALL'||(group==='UPPER'?upper.includes(a.region):!upper.includes(a.region))).map(a=><label className={`laser-catalogue-area ${ids.includes(a.id)?'selected':''}`} key={a.id}><input type="checkbox" checked={ids.includes(a.id)} onChange={()=>select(a.id)}/><span>{a.name}</span><strong>{money(a.price)}</strong></label>)}
     {offers.length>0&&<details className="laser-offer-list" open><summary>العروض والباقات المتاحة</summary>{offers.map(o=><label className="laser-offer" key={o.id}><input type="radio" name={`${service.id}-offer`} checked={value.offerId===o.id} onChange={()=>{const next={...value,areaIds:o.areaIds,offerId:o.id,hairAssessments:Object.fromEntries(Object.entries(value.hairAssessments??{}).filter(([id])=>o.areaIds.includes(id)))};try{quoteService(service,{...next,gender});update(next);}catch(e){setError(e instanceof Error?e.message:'تعذر اختيار الباقة');}}}/><span><strong>{o.name}</strong><small>{o.areaIds.map(id=>areas.find(a=>a.id===id)?.name).join('، ')}</small><small>{o.sessionsTotal??1} جلسة · {money(o.price)}</small></span></label>)}{value.offerId&&<button type="button" onClick={()=>update({...value,offerId:undefined})}>بدون عرض — أسعار المناطق</button>}</details>}
    </section>
