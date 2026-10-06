@@ -8,7 +8,7 @@ export default function ServiceDetailPanel({service,onClose,onBook,onEdit}:{serv
  const [expanded,setExpanded]=useState(false);
  useEffect(()=>{const element=dialog.current;const trigger=document.activeElement as HTMLElement|null;element?.showModal();return()=>{element?.close();trigger?.focus();};},[]);
  return <dialog ref={dialog} className={`service-detail-panel ${expanded?'is-expanded':''}`} aria-labelledby="service-detail-title" onCancel={e=>{e.preventDefault();onClose();}}>
-  <header><div><small>الصالون / الخدمات والأسعار / {label(service.department)}</small><h2 id="service-detail-title">{service.name}</h2></div><div className="service-detail-controls"><button type="button" aria-pressed={expanded} onClick={()=>setExpanded(!expanded)}>{expanded?'تصغير التفاصيل':'تكبير التفاصيل'}</button><button type="button" onClick={onClose}>إغلاق</button></div></header>
+  <header><div><small>كتالوج الخدمات / {label(service.department)}</small><h2 id="service-detail-title">{service.name}</h2></div><div className="service-detail-controls"><button type="button" aria-pressed={expanded} onClick={()=>setExpanded(!expanded)}>{expanded?'تصغير التفاصيل':'تكبير التفاصيل'}</button><button type="button" onClick={onClose}>إغلاق</button></div></header>
   <div className="service-detail-content">
    {service.imageUrl&&<img className="service-detail-image" src={service.imageUrl} alt={service.name}/>}
    <dl className="service-detail-facts"><div><dt>السعر</dt><dd>{service.price==null?'لم يحدد بعد':`${Number(service.price).toFixed(2)} ₪`}</dd></div><div><dt>المدة</dt><dd>{service.durationMinutes>0?`${service.durationMinutes} دقيقة`:'لم تحدد بعد'}</dd></div><div><dt>الحالة</dt><dd>{service.active===false?'غير فعالة':'فعالة'}</dd></div></dl>

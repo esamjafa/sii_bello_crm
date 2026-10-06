@@ -1,6 +1,8 @@
 import {resolve} from 'node:path';
+import {verifyAdminCatalogue} from './crm-admin-catalogue-browser.mjs';
 import {verifyLaserRegistrationBrowser} from './crm-laser-registration-browser.mjs';
 export async function verifyOctoberBrowser({browser,base,db,check,output,cookies}){
+ await verifyAdminCatalogue({browser,base,db,check,output,cookies});
  const laser=await db.service.findFirst({where:{name:'ليزر قبول أكتوبر'}});
  const hair=await db.service.findFirst({where:{name:'شعر قبول أكتوبر'}});
  const regional=await db.service.findFirst({where:{name:'اختبار قواعد الليزر أكتوبر ٢'}});
@@ -29,8 +31,8 @@ export async function verifyOctoberBrowser({browser,base,db,check,output,cookies
  page.once('dialog',d=>d.accept());await page.getByRole('button',{name:'أنثى',exact:true}).click();check('Gender switch removes incompatible beard selection',await page.getByRole('checkbox',{name:/اللحية/}).count()===0&&await page.getByText(/السعر النهائي:/).count()===0);
  await context.close();
  const staffContext=await browser.newContext({viewport:{width:1440,height:1000}});await staffContext.addCookies([{name:'salon_session',value:cookies.STAFF,domain:'localhost',path:'/'}]);const staffPage=await staffContext.newPage();await staffPage.goto(base);
- await staffPage.getByRole('navigation').getByRole('button',{name:'الصالون',exact:true}).click();await staffPage.getByRole('button',{name:'كل السجلات والخدمات',exact:true}).click();await staffPage.getByRole('button',{name:'الخدمات والأسعار',exact:true}).click();
- await staffPage.getByRole('textbox',{name:'بحث في القائمة'}).fill(laser.name);await staffPage.getByRole('button',{name:'ليزر',exact:true}).click();await staffPage.getByRole('button',{name:new RegExp(laser.name)}).click();
+ await staffPage.getByRole('navigation').getByRole('button',{name:'كتالوج الخدمات',exact:true}).click();
+ await staffPage.getByRole('textbox',{name:'بحث في القائمة'}).fill(laser.name);await staffPage.getByLabel('قسم كتالوج الخدمات').selectOption('LASER');await staffPage.getByRole('button',{name:new RegExp(laser.name)}).click();
  const drawer=staffPage.getByRole('dialog');await drawer.waitFor();
  check('Staff can read service details without edit permission',await drawer.getByRole('heading',{name:laser.name}).isVisible()&&await drawer.getByRole('button',{name:'تعديل إعدادات الخدمة'}).count()===0);
  await drawer.getByRole('button',{name:'تكبير التفاصيل'}).click();check('Service details can maximize',await drawer.evaluate(el=>el.getBoundingClientRect().width>=window.innerWidth-2));

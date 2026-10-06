@@ -32,6 +32,7 @@ const access:Record<string,string[]> = {
 export function allowed(u:Actor,r:string,write=false) {
  if(!Object.hasOwn(crm,r)||u.role==='CUSTOMER') return false;
  if(owners(u)) return !write||!['audit','team','documents'].includes(r);
+ if(write&&r==='services')return false;
  if(!(access[u.role]??[]).includes(r))return false;
  if(!write)return true;
  if(['team','audit','documents'].includes(r)||u.role==='VIEWER')return false;

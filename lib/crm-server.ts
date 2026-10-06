@@ -4,7 +4,7 @@ import { Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { hash } from 'bcryptjs';
 import { prisma } from './prisma';
-import { crm, type CrmField } from './crm-config';
+import { crm, serviceDepartments, type CrmField } from './crm-config';
 import { actorDepartments, allowed, catalogueInterestVisible, customerScope, fieldAllowed, financial, managers, owners, sanitize, scope, type Actor } from './crm-access';
 import { parseSchedule } from './staff-schedule';
 import { normalizePhone } from './phone';
@@ -78,6 +78,12 @@ export async function listRecords(u:Actor,r:string,url:URL) {
  const page=Math.max(1,Math.min(100000,Number(url.searchParams.get('page'))||1));
  const take=Math.min(100,Math.max(1,Number(url.searchParams.get('limit'))||30));
  const where:any={AND:[scope(u,r)]};
+ if(r==='services'){
+   const department=url.searchParams.get('department');
+   if(department){if(!serviceDepartments.includes(department))fail('القسم غير صالح');where.AND.push({department});}
+   const active=url.searchParams.get('active');
+   if(active==='true'||active==='false')where.AND.push({active:active==='true'});
+ }
  if(r==='appointments'){
   for(const key of ['staffId','serviceId'])if(url.searchParams.get(key))where.AND.push({[key]:url.searchParams.get(key)});
   const day=url.searchParams.get('day');
@@ -406,6 +412,8 @@ export async function mutateRecord(u:Actor,r:string,body:any,method:string){
   }
   if(r==='expenses')data.status=combined.paidAt?'PAID':'DUE';
   if(r==='services'){
+    if(!serviceDepartments.includes(combined.department))fail('حددي القسم المرتبط بالخدمة');
+    if(Math.abs(Number(combined.price)*100-Math.round(Number(combined.price)*100))>0.00001)fail('السعر يقبل منزلتين عشريتين');
     if(!Number.isInteger(combined.bufferMinutes??0)||(combined.bufferMinutes??0)>240)fail('الفاصل من 0 إلى 240 دقيقة');
     if(combined.imageUrl&&!/^\/(?!\/)[^\s]*$/.test(combined.imageUrl)&&!/^https:\/\//.test(combined.imageUrl))fail('رابط الصورة يجب أن يبدأ بـ https أو يكون محليًا');
     if(combined.department!=='LASER'&&(combined.configuration?.areas?.length||combined.configuration?.offers?.length))fail('المناطق والعروض لخدمة الليزر فقط');
@@ -425,8 +433,9 @@ export async function mutateRecord(u:Actor,r:string,body:any,method:string){
     if(selectionChanged&&(service.department!=='LASER'||service.configuration||data.serviceDetails?.areaIds?.length)){try{quote=quoteService(service,data.serviceDetails??{});}catch(e:any){fail(e.message);}}
     if(quote){data.serviceDetails=quote.details;data.priceSnapshot=quote;}
     if(changedService){data.resourceKey=service.resourceKey;data.bufferMinutes=service.bufferMinutes;}
-    const price=quote&&service.department==='LASER'?quote.finalPrice:data.price??(changedService?service.price:previous.price??service.price);
-    if(!managers(u)&&(Number(duration)!==Number(changedService?service.durationMinutes:previous.durationMinutes??service.durationMinutes)||!decimal(price).eq(quote&&service.department==='LASER'?quote.finalPrice:changedService?service.price:previous.price??service.price)))fail('تعديل سعر الخدمة أو مدتها للإدارة',403);
+    const cataloguePrice=quote&&(service.department==='LASER'||'variant' in quote&&quote.variant)?quote.finalPrice:undefined;
+    const price=cataloguePrice??data.price??(changedService?service.price:previous.price??service.price);
+    if(!managers(u)&&(Number(duration)!==Number(changedService?service.durationMinutes:previous.durationMinutes??service.durationMinutes)||!decimal(price).eq(cataloguePrice??(changedService?service.price:previous.price??service.price))))fail('تعديل سعر الخدمة أو مدتها للإدارة',403);
     if(!Number.isInteger(duration)||duration<1||duration>1440)fail('مدة الخدمة من 1 إلى 1440 دقيقة');
     data.durationMinutes=duration;data.price=price;if(data.priceSnapshot)data.priceSnapshot.finalPrice=Number(price);
     if(['SCHEDULED','CONFIRMED','PENDING_REPLY','COMPLETED'].includes(combined.status??'SCHEDULED')){

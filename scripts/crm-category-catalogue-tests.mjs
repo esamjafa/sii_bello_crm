@@ -1,10 +1,19 @@
 export async function verifyCategoryCatalogue({req,check,db,users,customers,create}){
  const config={areas:[],offers:[],variants:[{id:'short',name:'قص شعر قصير',kind:'CUT',hairLength:'SHORT',price:100},{id:'long',name:'قص شعر طويل',kind:'CUT',hairLength:'LONG',price:180},{id:'extensions',name:'وصلات سوداء 60 سم — 50 قطعة',kind:'EXTENSIONS',extensionColor:'أسود',extensionLength:60,extensionQuantity:50,price:500}]};
  const hair=await create('services',{name:'كتالوج شعر تجريبي',department:'HAIR',price:50,durationMinutes:60,configuration:config});
+ const skin=await create('services',{name:'كتالوج بشرة تجريبي',department:'SKIN',price:50,durationMinutes:30,configuration:{areas:[],offers:[],variants:[{id:'deep',name:'تنظيف عميق',price:240}]}});
+ const department=await req('/api/crm/services?department=SKIN');check('Service catalogue filters departments across the entire list',department.status===200&&department.data.rows.some(x=>x.id===skin.id)&&department.data.rows.every(x=>x.department==='SKIN'));
+ check('Invalid catalogue department rejected',(await req('/api/crm/services?department=INVALID')).status===400);
+ for(const role of ['MANAGER','RECEPTIONIST','STAFF','VIEWER'])check(`${role} cannot change catalogue prices`,(await req('/api/crm/services',{role,method:'PATCH',body:{id:skin.id,price:1}})).status===403);
+ const inactive=await req('/api/crm/services',{method:'PATCH',body:{id:skin.id,active:false}});check('Admin can deactivate catalogue entries',inactive.status===200);
+ const disabled=await req('/api/crm/services?department=SKIN&active=false');check('Catalogue can filter inactive entries',disabled.data.rows.some(x=>x.id===skin.id)&&disabled.data.rows.every(x=>!x.active));
+ await req('/api/crm/services',{method:'PATCH',body:{id:skin.id,active:true}});
+ const appointment=await create('appointments',{customerId:customers.ADMIN.id,serviceId:skin.id,startsAt:'2036-01-05T10:00:00.000Z',status:'CANCELLED',price:1,serviceDetails:{variantId:'deep'}});check('Every department appointment uses its configured option price',Number(appointment.price)===240&&appointment.priceSnapshot.finalPrice===240);
  const course=await create('collegeCourses',{title:'دورة كتالوج تجريبية',fee:1200,capacity:20,status:'OPEN',coordinatorId:users.COLLEGE.id,trainerId:users.TRAINER.id});
  const event=await create('events',{name:'إيفنت كتالوج تجريبي',currency:'AED',managerId:users.EVENT_MANAGER.id});
  const pack=await create('eventPackages',{eventId:event.id,name:'Standard',price:900});
  const catalogue=await req('/api/crm/catalogue');check('Admin catalogue includes all five major categories',['LASER','HAIR','NAILS','COLLEGE','EVENT'].every(c=>catalogue.data.categories.includes(c)));
+ check('Every treatment department is available in the customer catalogue',['SKIN','BROWS','MASSAGE','WAX','MAKEUP','PIERCING','TOOTH_GEMS','EXTRA'].every(c=>catalogue.data.categories.includes(c))&&catalogue.data.rows.some(x=>x.id===skin.id&&x.category==='SKIN'));
  check('Catalogue connects actual courses and event packages',catalogue.data.rows.some(x=>x.id===course.id&&x.kind==='COLLEGE')&&catalogue.data.rows.some(x=>x.id===pack.id&&x.currency==='AED'));
  const staff=await req('/api/crm/catalogue',{role:'STAFF'});check('Staff catalogue excludes college and event data',staff.status===200&&staff.data.rows.every(x=>x.kind==='SERVICE')&&!staff.data.categories.includes('COLLEGE'));
  const college=await req('/api/crm/catalogue',{role:'COLLEGE'});check('College catalogue excludes salon and event data',college.data.categories.length===1&&college.data.categories[0]==='COLLEGE');
